@@ -72,6 +72,7 @@ int main() {
     heap = malloc(128);
     mem_init(heap, 128);
 
+    TEST_FREE_1();
     TEST_FREE_2();
     return 0;
 }
