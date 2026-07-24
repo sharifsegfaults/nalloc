@@ -83,8 +83,9 @@ extern void bk_set_color(hptr_t block, Color color);
 extern bool bk_is_free(hptr_t block);
 extern void bk_set_is_free(hptr_t block, bool is_free);
 
-/* -------------------------- BLOCK FAMILY MEMBERS -------------------------- */
+/* ----------------------------- BLOCK NEIGHBOURS ---------------------------- */
 extern hptr_t next_block(hptr_t block);
+extern hptr_t prev_block(hptr_t block);
 
 extern team_t team;
 

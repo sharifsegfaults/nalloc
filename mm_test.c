@@ -68,6 +68,8 @@ bool TEST_FREE_2() {
     return true;
 }
 
+// Test for realloc: realloc on a scenario where there is enough space, but only once the block is freed
+
 int main() {
     heap = malloc(128);
     mem_init(heap, 128);

@@ -12,6 +12,8 @@
 
 // TODO(style): Implement `footer` and `header`
 
+// TODO(style): changhe right_bk for leftover_bk — it's clearer (on `partition_if_worth_it`)
+
 /* -------------------------------------------------------------------------- */
 /*                              STATIC VARIABLES                              */
 /* -------------------------------------------------------------------------- */
@@ -102,14 +104,15 @@ void bk_set_color(hptr_t block, Color color) {
 
 bool bk_is_free(hptr_t block) {
     assert(block != NULL_HPTR);
-    return bk_prev_free(next_block(block));
+    hptr_t nblock = next_block(block) == NULL_HPTR ? rbtree.block : next_block(block);
+    return bk_prev_free(nblock);
 }
 
 void bk_set_is_free(hptr_t block, bool is_free) {
     assert(block != NULL_HPTR);
     
     // If this is the last block, the ghost node contains its prev free
-    if (block + sizeof(uint32_t) + bk_size(block) >= mem_heapsize()) {
+    if (next_block(block) == NULL_HPTR) {
         bk_set_prev_free(rbtree.block, is_free);
         return;
     }
@@ -117,12 +120,21 @@ void bk_set_is_free(hptr_t block, bool is_free) {
     bk_set_prev_free(next_block(block), is_free);
 }
 
-/* -------------------------- BLOCK FAMILY MEMBERS ------------------------- */
+/* ---------------------------- BLOCK NEIGHBOURS ---------------------------- */
 hptr_t next_block(hptr_t block){
     if (block + sizeof(uint32_t) + bk_size(block) >= mem_heapsize()) {
         return NULL_HPTR;
     }
     return block + sizeof(uint32_t) + bk_size(block);
+}
+
+hptr_t prev_block(hptr_t block) {
+    if (block == next_block(rbtree.block)) {
+        return NULL_HPTR;
+    }
+
+    uint32_t prev_block_size = ((BlockFooter*)((char*)mem_heap_lo() + block - sizeof(BlockFooter)))->size;
+    return block - prev_block_size - sizeof(uint32_t);
 }
 
 // Partition memory block
@@ -183,19 +195,23 @@ hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
     return NULL_HPTR;
 }
 
+// ! Parts of the program depend on this thing overwriting only the header and footer of both blocks
 /**
  * @pre block1 is to the left of block2, both are free blocks, and both have been removed
  * from the rbtree
  */
 void coalesce_blocks(hptr_t block1, hptr_t block2) {
-    // TODO: For realloc, make sure to not check whether block1 is free
-    assert(bk_is_free(block1) && bk_is_free(block2));
+    assert(bk_is_free(block2));
     assert(next_block(block1) == block2);
 
     uint32_t new_size = bk_size(block1) + sizeof(uint32_t) + bk_size(block2);
 
-    // ! Pay attention to this logic when writing realloc
-    // * No need to set prev_free of next_block(block2) since block2 is already assumed to be free
+    if (next_block(block2) != NULL_HPTR) {
+        bk_set_prev_free(next_block(block2), bk_is_free(block1));
+    } else {
+        bk_set_prev_free(rbtree.block, bk_is_free(block1));
+    }
+
     bk_set_size(block1, new_size);
 }
 
@@ -209,6 +225,7 @@ int mm_init() {
 // ALIGNMENT
 // Last block may not be free
 
+// TODO: CONSIDER THE CASE WHERE WE RUN OUT OF MEMORY -- I.E. NALLOC FAILS -- I.E. RETURNS NULL
 void* nalloc(size_t size) {
     // Lazy initialization
     if (rbtree.block == NULL_HPTR) {
@@ -216,9 +233,11 @@ void* nalloc(size_t size) {
         uint32_t ghost_node_size = ALIGN(sizeof(BlockHeader) + sizeof(BlockFooter));
         mem_sbrk(padding + ghost_node_size);
         // Setup ghost node
+        // ! Other parts of the program (prev_block()) rely on the ghost node being the first node
+        // ! (in terms of heap arrangement)
         rbtree.block = padding;
-        //! Fix this BS
         bk_set_left(rbtree.block, NULL_HPTR);
+        bk_set_size(rbtree.block, ghost_node_size - sizeof(uint32_t)); // ! Ghost node must still be represented by a valid node
         bk_set_prev_free(rbtree.block, false);
     }
 
@@ -305,6 +324,94 @@ void mm_free(void* ptr) {
     rbtree_insert(rbtree, block);
 }
 
+/**
+ * 1. Free neighbor -> Coalesce with it
+ * 2. Including the to-realloc block, there's enough space -- not enough otherwise
+ * 3. Usual -> Malloc somewhere else, then free
+ * 
+ * 4. Shrinking -> Create new free node if worth it
+ */
 void* mm_realloc(void* ptr, size_t size) {
-    return 0;
+    size = ALIGN(sizeof(uint32_t) + size) - sizeof(uint32_t);
+
+    hptr_t block = ((uintptr_t)ptr - (uintptr_t)mem_heap_lo()) - sizeof(uint32_t);
+    hptr_t pblock = prev_block(block);
+    //! Consider what happens with no next or previous block 
+    hptr_t nblock = next_block(block);
+
+    uint32_t space_needed = sizeof(uint32_t) + size;
+
+    if (nblock != NULL_HPTR && bk_is_free(nblock) && bk_size(block) + sizeof(uint32_t) + bk_size(nblock) >= size) {
+        // Merge the two together
+        rbtree_remove(rbtree, nblock);
+        coalesce_blocks(block, nblock);
+        // Partition if necessary
+        hptr_t right_bk =  partition_if_worth_it(block, size);
+        if (right_bk != NULL_HPTR) {
+            bk_set_is_free(right_bk, true);
+            rbtree_insert(rbtree, right_bk);
+        }
+        // Return
+        return (char*)mem_heap_lo() + block + sizeof(uint32_t);
+    }
+
+    if (pblock != NULL_HPTR && bk_is_free(pblock) && bk_size(pblock) + sizeof(uint32_t) + bk_size(block) >= size) {
+        uint32_t prev_size = bk_size(block);
+        // Merge the two together
+        rbtree_remove(rbtree, pblock);
+        BlockFooter user_info_in_footer;
+        memcpy(&user_info_in_footer, bk_footer(block), sizeof(BlockFooter));
+        coalesce_blocks(pblock, block);
+        // Partition if necessary
+        hptr_t right_bk = partition_if_worth_it(pblock, size);
+        if (right_bk != NULL_HPTR) {
+            // Check if we need to coalesce with right block
+            if (bk_is_free(nblock)) {
+                rbtree_remove(rbtree, nblock);
+                bk_set_is_free(block, true);
+                coalesce_blocks(right_bk, nblock);
+            }
+            bk_set_is_free(right_bk, true);
+            rbtree_insert(rbtree, right_bk);
+        }
+
+        char* block_uptr = (char*)mem_heap_lo() + block + sizeof(uint32_t);
+        char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
+        memmove(pblock_uptr, block_uptr, prev_size);
+        memcpy(bk_footer(pblock), &user_info_in_footer, sizeof(BlockFooter));
+        return (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
+    }
+
+    if (pblock != NULL_HPTR && nblock != NULL_HPTR
+    && bk_is_free(pblock) && bk_is_free(nblock)
+    && bk_size(pblock) + 2*sizeof(uint32_t) + bk_size(block) + bk_size(nblock) >= size) {
+        uint32_t prev_size = bk_size(block);
+
+        rbtree_remove(rbtree, pblock);
+        rbtree_remove(rbtree, nblock);
+        // ! Order matters -- allows us to avoid footer overwrite of `block`
+        coalesce_blocks(block, nblock);
+        coalesce_blocks(pblock, block);
+
+        hptr_t leftover_bk = partition_if_worth_it(pblock, size);
+        if (leftover_bk != NULL_HPTR) {
+            bk_set_is_free(leftover_bk, true);
+            rbtree_insert(rbtree, leftover_bk);
+        }
+
+        char* block_uptr = (char*)mem_heap_lo() + block + sizeof(uint32_t);
+        char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
+        memmove(pblock_uptr, block_uptr, prev_size);
+        bk_set_is_free(pblock, false);
+
+        return (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
+    }
+
+    // If nothing worked... We just do the usual
+    char* new_ptr = nalloc(size);
+    if (new_ptr != NULL) {
+        memcpy(new_ptr, ptr, bk_size(block));
+        mm_free(ptr);
+    }
+    return new_ptr;
 }
