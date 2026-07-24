@@ -336,11 +336,24 @@ void* mm_realloc(void* ptr, size_t size) {
 
     hptr_t block = ((uintptr_t)ptr - (uintptr_t)mem_heap_lo()) - sizeof(uint32_t);
     hptr_t pblock = prev_block(block);
-    //! Consider what happens with no next or previous block 
     hptr_t nblock = next_block(block);
 
     uint32_t space_needed = sizeof(uint32_t) + size;
 
+    /* -------------------------------- SHRINKING ------------------------------- */
+    if (bk_size(block) >= size) {
+        hptr_t leftover_bk = partition_if_worth_it(block, size);
+        if (leftover_bk != NULL_HPTR) {
+            if (bk_is_free(nblock)) {
+                rbtree_remove(rbtree, nblock);
+                coalesce_blocks(leftover_bk, nblock);
+            }
+            rbtree_insert(rbtree, leftover_bk);
+        }
+        return ptr;
+    }
+
+    /* -------------------------------- EXPANDING ------------------------------- */
     if (nblock != NULL_HPTR && bk_is_free(nblock) && bk_size(block) + sizeof(uint32_t) + bk_size(nblock) >= size) {
         // Merge the two together
         rbtree_remove(rbtree, nblock);
