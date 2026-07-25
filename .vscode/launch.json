@@ -8,7 +8,7 @@
             "name": "(lldb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/rbtree_test",
+            "program": "${workspaceFolder}/bins/mm_test",
             "args": [],
             "stopAtEntry": true,
             "cwd": "${fileDirname}",

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "mm.h"
 
 static char* heap;
@@ -69,12 +70,57 @@ bool TEST_FREE_2() {
 }
 
 // Test for realloc: realloc on a scenario where there is enough space, but only once the block is freed
+bool TEST_REALLOC_1() {
+    mm_init();
+    char* p1 = nalloc(40);
+    char* p2 = nalloc(40);
+    char* p3 = nalloc(40);
+
+    strcpy(p1, "This is a 40 byte long message... aa!!!");
+    strcpy(p2, "This is a 40 byte long message... bb!!!");
+    strcpy(p3, "This is a 40 byte long message... cc!!!");
+
+    mm_free(p1);
+    mm_free(p3);
+
+    char* p2_ = mm_realloc(p2, 65);
+    assert(p2_ == p2);
+    // Expect p2 merged with p3 -- plus some extra space
+    strcpy(p2_, "52 bytes are represented in this beautiful string!! and now this");
+    mm_realloc(p2_, 84);
+
+    return true;
+}
+
+bool TEST_REALLOC_2() {
+    mm_init();
+    char* p1 = nalloc(40);
+    char* p2 = nalloc(40);
+    char* p3 = nalloc(40);
+
+    strcpy(p1, "This is a 40 byte long message... aa!!!");
+    strcpy(p2, "This is a 40 byte long message... bb!!!");
+    strcpy(p3, "This is a 40 byte long message... cc!!!");
+
+    mm_free(p1);
+    char* p2_ = mm_realloc(p2, 65);
+    assert(p2_ == p1);
+
+    mm_free(p3);
+    char* p2__ = mm_realloc(p2_, 110);
+    assert(p2__ == p2_);
+    strcpy(p2__, "This is a 40 byte long message... nevermind, it's actually 110... or I think... :) kjashdjkahsjkdhaksdaaaaaaa");
+
+    return true;
+}
 
 int main() {
-    heap = malloc(128);
-    mem_init(heap, 128);
+    heap = malloc(1 * 1024);
+    mem_init(heap, 1 * 1024);
 
     TEST_FREE_1();
     TEST_FREE_2();
+    TEST_REALLOC_1();
+    TEST_REALLOC_2();
     return 0;
 }

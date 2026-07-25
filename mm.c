@@ -54,7 +54,7 @@ void bk_set_prev_free(hptr_t block, bool prev_free) {
 
 void bk_set_size(hptr_t block, uint32_t size) {
     assert(block != NULL_HPTR);
-    // assert(size % 4 == 0);
+    assert(size % 4 == 0);
     bk_header(block)->__spfc &= 0b11;
     bk_header(block)->__spfc |= size;
     bk_footer(block)->size = size;
@@ -157,10 +157,9 @@ hptr_t prev_block(hptr_t block) {
  * 
  * @param size_needed Size needed in "user size" (i.e., do not include metadata)
  * 
- * @remark This function corrupts the rbtree metadata as well as curr_free
+ * @remark This function corrupts the rbtree metadata
  */
 hptr_t partition_block(hptr_t block, uint32_t size_needed) {
-    assert(!bk_is_free(block));
     assert(size_needed >= 16);
     size_needed = ALIGN(sizeof(uint32_t) + size_needed) - sizeof(uint32_t);
 
@@ -172,11 +171,11 @@ hptr_t partition_block(hptr_t block, uint32_t size_needed) {
 
     hptr_t right_bk = block + total_left_space;
 
-    bk_set_size(block, size_needed);
-
+    
     bk_set_size(right_bk, total_right_space - sizeof(uint32_t));
-    bk_set_is_free(right_bk, true);
     bk_set_prev_free(right_bk, bk_is_free(block));
+    bk_set_is_free(right_bk, true);
+    bk_set_size(block, size_needed);
 
     return right_bk;
 }
@@ -189,7 +188,8 @@ hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
 
     // If the remaining block can host a 16-byte allocation, let it live
     if (block_space - total_left_space >= sizeof(uint32_t) + 16) {
-        return partition_block(block, size_needed);
+        hptr_t res = partition_block(block, size_needed);
+        return res;
     }
 
     return NULL_HPTR;
@@ -201,7 +201,7 @@ hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
  * from the rbtree
  */
 void coalesce_blocks(hptr_t block1, hptr_t block2) {
-    assert(bk_is_free(block2));
+    assert(bk_is_free(block1) || bk_is_free(block2));
     assert(next_block(block1) == block2);
 
     uint32_t new_size = bk_size(block1) + sizeof(uint32_t) + bk_size(block2);
@@ -248,10 +248,10 @@ void* nalloc(size_t size) {
     if (free_block != NULL_HPTR) {
         rbtree_remove(rbtree, free_block);
         bk_set_is_free(free_block, false);
-        hptr_t right_bk = partition_if_worth_it(free_block, size);
-        if (right_bk != NULL_HPTR) {
-            bk_set_is_free(right_bk, true);
-            rbtree_insert(rbtree, right_bk);
+        hptr_t leftover_bk = partition_if_worth_it(free_block, size);
+        if (leftover_bk != NULL_HPTR) {
+            bk_set_is_free(leftover_bk, true);
+            rbtree_insert(rbtree, leftover_bk);
         }
         return (char*)mem_heap_lo() + free_block + sizeof(uint32_t);
     }
@@ -344,7 +344,7 @@ void* mm_realloc(void* ptr, size_t size) {
     if (bk_size(block) >= size) {
         hptr_t leftover_bk = partition_if_worth_it(block, size);
         if (leftover_bk != NULL_HPTR) {
-            if (bk_is_free(nblock)) {
+            if (nblock != NULL_HPTR && bk_is_free(nblock)) {
                 rbtree_remove(rbtree, nblock);
                 coalesce_blocks(leftover_bk, nblock);
             }
@@ -375,6 +375,13 @@ void* mm_realloc(void* ptr, size_t size) {
         BlockFooter user_info_in_footer;
         memcpy(&user_info_in_footer, bk_footer(block), sizeof(BlockFooter));
         coalesce_blocks(pblock, block);
+
+        // Copy the user's info
+        char* block_uptr = (char*)mem_heap_lo() + block + sizeof(uint32_t);
+        char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
+        memmove(pblock_uptr, block_uptr, prev_size);
+        memcpy(bk_footer(pblock), &user_info_in_footer, sizeof(BlockFooter));
+
         // Partition if necessary
         hptr_t right_bk = partition_if_worth_it(pblock, size);
         if (right_bk != NULL_HPTR) {
@@ -388,11 +395,7 @@ void* mm_realloc(void* ptr, size_t size) {
             rbtree_insert(rbtree, right_bk);
         }
 
-        char* block_uptr = (char*)mem_heap_lo() + block + sizeof(uint32_t);
-        char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
-        memmove(pblock_uptr, block_uptr, prev_size);
-        memcpy(bk_footer(pblock), &user_info_in_footer, sizeof(BlockFooter));
-        return (char*)mem_heap_lo() + pblock + sizeof(uint32_t);
+        return pblock_uptr;
     }
 
     if (pblock != NULL_HPTR && nblock != NULL_HPTR
