@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdalign.h>
+#include <stddef.h>
 
 #include "memlib.h"
 
@@ -39,18 +41,19 @@ extern void *mm_realloc(void *ptr, size_t size);
 typedef uint32_t hptr_t;
 #define NULL_HPTR UINT32_MAX
 
-#define ALIGNMENT 8
-// TODO: Fix it to be compatible with any ALIGNMENT
+#define ALIGNMENT alignof(max_align_t)
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT-1))
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20
-
-// TODO: Fix the BS -- Color should be in the rbtree file.
 
 typedef enum : uint8_t {
     RED = 0,
     BLACK = 1
 } Color;
+
+typedef struct {
+    _Alignas(ALIGNMENT) uint32_t __spfc;
+} AllocBlockHeader;
 
 // Thank you NegVorsa!
 typedef struct {
@@ -58,7 +61,7 @@ typedef struct {
     hptr_t left;
     hptr_t right;
     hptr_t parent;
-} BlockHeader;
+} FreeBlockHeader;
 
 typedef struct {
     uint32_t size;
