@@ -6,14 +6,6 @@
 #include "mm.h"
 #include "rbtree.h"
 
-// TODO: Whenever adding bytes to a block for the sake of alignment,
-// TODO: we should expand user section rather than footer because it could improve
-// TODO: the chance of finding blocks for future requests
-
-// TODO(style): Implement `footer` and `header`
-
-// TODO(style): changhe right_bk for leftover_bk — it's clearer (on `partition_if_worth_it`)
-
 /* -------------------------------------------------------------------------- */
 /*                              STATIC VARIABLES                              */
 /* -------------------------------------------------------------------------- */
@@ -31,11 +23,6 @@ BlockFooter* bk_footer(hptr_t block) {
     return (BlockFooter*)((char*)mem_heap_lo() + block + bk_size(block));
 }
 
-/**
- * @pre Assumes header is well-formed
- * 
- * @remark Obtains size from block's header (not footer)
- */
 uint32_t bk_size(hptr_t block) {
     assert(block != NULL_HPTR);
     return bk_header(block)->__spfc & ~0b11;
@@ -137,20 +124,9 @@ hptr_t prev_block(hptr_t block) {
     return block - prev_block_size - sizeof(uint32_t);
 }
 
-// Partition memory block
-
-// Merge memory blocks
-// FREE / ALLOCATED MANAGEMENT
-// Free a block --> RBT insertion
-// Allocating a block --> RBT removal
-// 
-
-// TODO: Expand the heap, do we want to expand it by the exact amount? or do we use some heuristic?
 /* -------------------------------------------------------------------------- */
 /*                             BLOCK MANIPULATION                             */
 /* -------------------------------------------------------------------------- */
-// Things to store:
-// - Size of the heap
 
 /**
  * @pre Block can actually accomodate for the requested partition
@@ -187,7 +163,7 @@ hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
     uint32_t total_left_space = sizeof(uint32_t) + size_needed;
 
     // If the remaining block can host a 16-byte allocation, let it live
-    if (block_space - total_left_space >= sizeof(uint32_t) + 16) {
+    if (block_space - total_left_space >= PARTITION_THRESHOLD) {
         hptr_t res = partition_block(block, size_needed);
         return res;
     }
@@ -221,17 +197,15 @@ int mm_init() {
     return 0;
 }
 
-// Some issues...
-// ALIGNMENT
-// Last block may not be free
-
-// TODO: CONSIDER THE CASE WHERE WE RUN OUT OF MEMORY -- I.E. NALLOC FAILS -- I.E. RETURNS NULL
 void* nalloc(size_t size) {
     // Lazy initialization
     if (rbtree.block == NULL_HPTR) {
         uint32_t padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
         uint32_t ghost_node_size = ALIGN(sizeof(BlockHeader) + sizeof(BlockFooter));
-        mem_sbrk(padding + ghost_node_size);
+        void* res = mem_sbrk(padding + ghost_node_size);
+        if (res == (void*)-1) {
+            return NULL;
+        }
         // Setup ghost node
         // ! Other parts of the program (prev_block()) rely on the ghost node being the first node
         // ! (in terms of heap arrangement)
@@ -256,25 +230,28 @@ void* nalloc(size_t size) {
         return (char*)mem_heap_lo() + free_block + sizeof(uint32_t);
     }
 
-    // There is no free block :(
-    // TODO: Perform calculation of recyclable space before expansion size
-    // Don't forget to update prev_free on newly introduced block
-    uint32_t expansion_size = ALIGN(MAX(
-        MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), sizeof(uint32_t) + size),
-        sizeof(BlockHeader) + sizeof(BlockFooter)
-    ));
     bool is_last_bk_free = bk_prev_free(rbtree.block);
     hptr_t last_bk = NULL_HPTR;
+    uint32_t recyclable_space = 0;
 
     if (is_last_bk_free) {
         uint32_t last_bk_size = ((BlockFooter*)((char*)mem_heap_hi() - 3))->size;
         last_bk = mem_heapsize() - last_bk_size - sizeof(uint32_t);
-        expansion_size -= sizeof(uint32_t) + last_bk_size;
+        recyclable_space = sizeof(uint32_t) + last_bk_size;
         
         rbtree_remove(rbtree, last_bk);
     }
 
-    mem_sbrk(expansion_size);
+    // There is no free block :(
+    uint32_t expansion_size = ALIGN(MAX(
+        MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), sizeof(uint32_t) + size - recyclable_space),
+        sizeof(BlockHeader) + sizeof(BlockFooter) - recyclable_space
+    ));
+
+    void* res = mem_sbrk(expansion_size);
+    if (res == (void*)-1) {
+        return NULL;
+    }
 
     if (is_last_bk_free) {
         bk_set_size(last_bk, bk_size(last_bk) + expansion_size);
@@ -286,10 +263,10 @@ void* nalloc(size_t size) {
     }
 
     bk_set_is_free(last_bk, false);
-    hptr_t right_bk = partition_if_worth_it(last_bk, size);
-    if (right_bk != NULL_HPTR) {
-        bk_set_is_free(right_bk, true);
-        rbtree_insert(rbtree, right_bk);
+    hptr_t leftover_bk = partition_if_worth_it(last_bk, size);
+    if (leftover_bk != NULL_HPTR) {
+        bk_set_is_free(leftover_bk, true);
+        rbtree_insert(rbtree, leftover_bk);
     }
 
     return (char*)mem_heap_lo() + last_bk + sizeof(uint32_t);
@@ -324,13 +301,6 @@ void mm_free(void* ptr) {
     rbtree_insert(rbtree, block);
 }
 
-/**
- * 1. Free neighbor -> Coalesce with it
- * 2. Including the to-realloc block, there's enough space -- not enough otherwise
- * 3. Usual -> Malloc somewhere else, then free
- * 
- * 4. Shrinking -> Create new free node if worth it
- */
 void* mm_realloc(void* ptr, size_t size) {
     size = ALIGN(sizeof(uint32_t) + size) - sizeof(uint32_t);
 
@@ -359,10 +329,10 @@ void* mm_realloc(void* ptr, size_t size) {
         rbtree_remove(rbtree, nblock);
         coalesce_blocks(block, nblock);
         // Partition if necessary
-        hptr_t right_bk =  partition_if_worth_it(block, size);
-        if (right_bk != NULL_HPTR) {
-            bk_set_is_free(right_bk, true);
-            rbtree_insert(rbtree, right_bk);
+        hptr_t leftover_bk =  partition_if_worth_it(block, size);
+        if (leftover_bk != NULL_HPTR) {
+            bk_set_is_free(leftover_bk, true);
+            rbtree_insert(rbtree, leftover_bk);
         }
         // Return
         return (char*)mem_heap_lo() + block + sizeof(uint32_t);
@@ -383,16 +353,16 @@ void* mm_realloc(void* ptr, size_t size) {
         memcpy(bk_footer(pblock), &user_info_in_footer, sizeof(BlockFooter));
 
         // Partition if necessary
-        hptr_t right_bk = partition_if_worth_it(pblock, size);
-        if (right_bk != NULL_HPTR) {
+        hptr_t leftover_bk = partition_if_worth_it(pblock, size);
+        if (leftover_bk != NULL_HPTR) {
             // Check if we need to coalesce with right block
             if (bk_is_free(nblock)) {
                 rbtree_remove(rbtree, nblock);
                 bk_set_is_free(block, true);
-                coalesce_blocks(right_bk, nblock);
+                coalesce_blocks(leftover_bk, nblock);
             }
-            bk_set_is_free(right_bk, true);
-            rbtree_insert(rbtree, right_bk);
+            bk_set_is_free(leftover_bk, true);
+            rbtree_insert(rbtree, leftover_bk);
         }
 
         return pblock_uptr;
