@@ -2,37 +2,36 @@
 
 #include "rbtree.h"
 
-// TODO: Change new_node name
-void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
-    assert(bk_is_free(new_node));
+void rbtree_insert(rbtree_t rbtree, hptr_t block) {
+    assert(bk_is_free(block));
 
     // Starting metadata
-    bk_set_left(new_node, NULL_HPTR);
-    bk_set_right(new_node, NULL_HPTR);
-    bk_set_parent(new_node, NULL_HPTR);
-    bk_set_color(new_node, RED);
+    bk_set_left(block, NULL_HPTR);
+    bk_set_right(block, NULL_HPTR);
+    bk_set_parent(block, NULL_HPTR);
+    bk_set_color(block, RED);
 
     hptr_t ghost_node = rbtree.block;
     hptr_t curr = root(rbtree);
 
     // If the tree is empty...
     if (root(rbtree) == NULL_HPTR) {
-        tlink(ghost_node, new_node, true);
+        tlink(ghost_node, block, true);
         bk_set_color(root(rbtree), BLACK);
         return;
     }
 
     // Navigate down the tree until you find the insertion spot
     while (true) {
-        if (bk_size(new_node) < bk_size(curr)) {
+        if (bk_size(block) < bk_size(curr)) {
             if (bk_left(curr) == NULL_HPTR) {
-                tlink(curr, new_node, true);
+                tlink(curr, block, true);
                 break;
             }
             curr = bk_left(curr);
         } else {
             if (bk_right(curr) == NULL_HPTR) {
-                tlink(curr, new_node, false);
+                tlink(curr, block, false);
                 break;
             }
             curr = bk_right(curr);
@@ -47,51 +46,51 @@ void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
     // pose as the newly inserted node, and make our parent
     // be the current node. We re-run this until we reach the root.
 
-    while (new_node != ghost_node) {
+    while (block != ghost_node) {
         // Case 0: new node is root --> make it black
-        if (root(rbtree) == new_node) {
-            bk_set_color(new_node, BLACK);
+        if (root(rbtree) == block) {
+            bk_set_color(block, BLACK);
             break;
         }
 
         // If there are no problems, we just continue :)
-        if (bk_color(new_node) != RED || bk_color(curr) != RED) {
-            new_node = curr;
+        if (bk_color(block) != RED || bk_color(curr) != RED) {
+            block = curr;
             curr = bk_parent(curr);
             continue;
         }
 
-        // Case 1: new_node's uncle is red
-        if (bk_color(uncle(new_node)) == RED) {
-            bk_set_color(grandpa(new_node), RED);
-            bk_set_color(uncle(new_node), BLACK);
-            bk_set_color(bk_parent(new_node), BLACK);
+        // Case 1: block's uncle is red
+        if (bk_color(uncle(block)) == RED) {
+            bk_set_color(grandpa(block), RED);
+            bk_set_color(uncle(block), BLACK);
+            bk_set_color(bk_parent(block), BLACK);
             // Move up the tree
-            new_node = curr;
+            block = curr;
             curr = bk_parent(curr);
             continue;
         }
 
-        // Case 2: uncle is black, and new_node forms a triangle with its grandpa
-        char tridir = check_if_triangle(new_node);
+        // Case 2: uncle is black, and block forms a triangle with its grandpa
+        char tridir = check_if_triangle(block);
         if (tridir != 0) {
-            if (tridir < 0) left_rotate(bk_parent(new_node));
-            else right_rotate(bk_parent(new_node));
+            if (tridir < 0) left_rotate(bk_parent(block));
+            else right_rotate(bk_parent(block));
             // Move up the tree
             hptr_t tmp = curr;
-            curr = new_node;
-            new_node = tmp;
+            curr = block;
+            block = tmp;
             continue;
         }
 
-        // Case 3: uncle is black, and new_node forms a line with its grandpa
-        char linedir = check_if_line(new_node);
+        // Case 3: uncle is black, and block forms a line with its grandpa
+        char linedir = check_if_line(block);
         if (linedir != 0) {
-            bk_set_color(grandpa(new_node), RED);
-            bk_set_color(bk_parent(new_node), BLACK);
+            bk_set_color(grandpa(block), RED);
+            bk_set_color(bk_parent(block), BLACK);
 
-            if (linedir < 0) right_rotate(grandpa(new_node));
-            else left_rotate(grandpa(new_node));
+            if (linedir < 0) right_rotate(grandpa(block));
+            else left_rotate(grandpa(block));
 
             break;
         }
