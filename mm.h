@@ -8,22 +8,30 @@
 #include "memlib.h"
 
 extern int mm_init (void);
-extern void *nalloc (size_t size);
-extern void mm_free (void *ptr);
-extern void *mm_realloc(void *ptr, size_t size);
 
-/* 
- * Students work in teams of one or two.  Teams enter their team name, 
- * personal names and login IDs in a struct of this
- * type in their bits.c file.
+/**
+ * @brief Allocate `size` bytes
+ * 
+ * @returns Pointer to memory section containing at least `size` modifiable bytes
  */
-typedef struct {
-    char *teamname; /* ID1+ID2 or ID1 */
-    char *name1;    /* full name of first member */
-    char *id1;      /* login ID of first member */
-    char *name2;    /* full name of second member (if any) */
-    char *id2;      /* login ID of second member */
-} team_t;
+extern void *nalloc (size_t size);
+
+/**
+ * @brief Frees a previously allocated memory block.
+ * 
+ * @param ptr  Pointer to block to be freed. Must be a pointer returned by a previous call to nalloc
+ */
+extern void mm_free (void *ptr);
+
+/**
+ * @brief Reallocates the information in memory block pointed to by `ptr` to
+ * a new memory block of size at least `size`
+ * 
+ * @param size Size of the new memory block
+ * 
+ * @returns Pointer to the new memory block
+ */
+extern void *mm_realloc(void *ptr, size_t size);
 
 /* -------------------------------------------------------------------------- */
 /*                                   CUSTOM                                   */
@@ -35,6 +43,7 @@ typedef uint32_t hptr_t;
 // TODO: Fix it to be compatible with any ALIGNMENT
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT-1))
 #define EXPANSION_FACTOR 0.35
+#define PARTITION_THRESHOLD 20
 
 // TODO: Fix the BS -- Color should be in the rbtree file.
 
@@ -61,6 +70,10 @@ typedef struct {
 
 /**
  * @brief Stores the size of the block if it were to be provided for allocation
+ * 
+ * @pre Assumes header is well-formed
+ * 
+ * @remark Obtains size from block's header (not footer)
  */
 extern uint32_t bk_size(hptr_t block);
 extern void bk_set_size(hptr_t block, uint32_t size);
@@ -86,8 +99,6 @@ extern void bk_set_is_free(hptr_t block, bool is_free);
 /* ----------------------------- BLOCK NEIGHBOURS ---------------------------- */
 extern hptr_t next_block(hptr_t block);
 extern hptr_t prev_block(hptr_t block);
-
-extern team_t team;
 
 /* ---------------------------------- TEMP ---------------------------------- */
 extern hptr_t partition_block(hptr_t block, uint32_t size_needed);

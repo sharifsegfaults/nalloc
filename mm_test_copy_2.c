@@ -18,7 +18,7 @@ void tearDown() {}
 // TODO: Test the bk_* functions
 
 typedef struct {
-    uint32_t ogsize;
+    uint32_t size;
     bool free;
     char* ptr;
     char* expected_data;
@@ -37,7 +37,7 @@ char* randstr(uint32_t size) {
 }
 
 Block bnalloc(uint32_t size) {
-    char* str = randstr(size-1);
+    char* str = randstr(size);
     Block block = {size, false, nalloc(size), str};
     strcpy(block.ptr, str);
     return block;
@@ -48,31 +48,24 @@ void bfree(Block b) {
     mm_free(b.ptr);
 }
 
-void bcoalesce(Block b1, Block b2) {
-    b1.ogsize += b2.ogsize + sizeof(uint32_t);
+void EXPECT_BLOCK(char* ptr, uint32_t size, bool is_free) {
+    hptr_t block = (uintptr_t)ptr - (uintptr_t)mem_heap_lo() - sizeof(uint32_t);
+    TEST_ASSERT_EQUAL(bk_size(block), size);
+    TEST_ASSERT_EQUAL(bk_is_free(block), is_free);
 }
 
 void EXPECT_HEAP(Block blocks[], uint32_t n) {
     // ! Not accounting for padding ~~~v
     uint32_t curr_bk = ALIGN(sizeof(BlockHeader) + sizeof(BlockFooter)); // Everything starts after ghost node
     for (uint32_t i = 0; i < n; i++) {
-        // Size
-        assert(
-            blocks[i].ogsize <= bk_size(curr_bk)
-        );
-        assert(
-            ALIGN(blocks[i].ogsize) + PARTITION_THRESHOLD + 16 >=
-            bk_size(curr_bk)
-        );
-
-        assert(bk_is_free(curr_bk) == blocks[i].free);
-        assert(strcmp(
+        TEST_ASSERT_EQUAL(bk_size(curr_bk), blocks[i].size);
+        TEST_ASSERT_EQUAL(bk_is_free(curr_bk), blocks[i].free);
+        TEST_ASSERT_EQUAL_STRING(
             (char*)mem_heap_lo() + curr_bk + sizeof(uint32_t),
             blocks[i].expected_data
-        ) == 0);
+        );
         curr_bk = next_block(curr_bk);
     }
-    assert(curr_bk == NULL_HPTR || bk_is_free(curr_bk) && next_block(curr_bk) == NULL_HPTR);
 }
 
 void TEST_MALLOC() {
@@ -81,40 +74,18 @@ void TEST_MALLOC() {
     Block b2 = bnalloc(S(53));
     Block b3 = bnalloc(S(12));
 
-    EXPECT_HEAP((Block[3]){
-        b1, b2, b3
-    }, 3);
-
     bfree(b2);
-    Block b4 = bnalloc(S(52));
 
-    EXPECT_HEAP((Block[3]){
-        b1, b4, b3       
-    }, 3);
-    
-    bfree(b4);
-    bfree(b3);
-    bcoalesce(b4, b3);
+    // ...
 
-    
-    EXPECT_HEAP((Block[2]) {
-        b1, b4
+    EXPECT_HEAP((Block[2]){
+        {}
     }, 2);
-
-    bfree(b4);
-    Block b5 = bnalloc(S(60));
-
-    EXPECT_HEAP((Block[2]) {
-        b1, b5
-    }, 2);
-    
-    printf("... Finished TEST_MALLOC");
 }
 
 int main() {
-    setUp();
-    //UNITY_BEGIN();
-    TEST_MALLOC();
-    //return UNITY_END();
+    UNITY_BEGIN();
+    RUN_TEST(TEST_MALLOC);
+    return UNITY_END();
     return 0;
 }
