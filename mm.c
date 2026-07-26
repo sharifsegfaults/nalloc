@@ -96,6 +96,7 @@ bool bk_is_free(hptr_t block) {
 
 void bk_set_is_free(hptr_t block, bool is_free) {
     assert(block != NULL_HPTR);
+    dbg_printf(is_free ? "%d block has been freed" : "%d block has been occupied");
     
     // If this is the last block, the ghost node contains its prev free
     if (next_block(block) == NULL_HPTR) {
@@ -135,17 +136,19 @@ hptr_t prev_block(hptr_t block) {
  * @remark This function corrupts the rbtree metadata
  */
 hptr_t partition_block(hptr_t block, uint32_t size_needed) {
+    
     assert(size_needed >= 16);
     size_needed = ALIGN(sizeof(AllocBlockHeader) + size_needed) - sizeof(AllocBlockHeader);
-
+    
     uint32_t total_space = sizeof(AllocBlockHeader) + bk_size(block);
     uint32_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
     uint32_t total_right_space = total_space - total_left_space;
-
+    dbg_printf("Partitioning block %d to left size of %d. Remaining free block of size: %d",
+                block, size_needed, total_right_space - sizeof(AllocBlockHeader));
+    
     assert(total_right_space >= sizeof(FreeBlockHeader) + sizeof(BlockFooter));
-
+    
     hptr_t right_bk = block + total_left_space;
-
     
     bk_set_size(right_bk, total_right_space - sizeof(AllocBlockHeader));
     bk_set_prev_free(right_bk, bk_is_free(block));
@@ -180,6 +183,8 @@ void coalesce_blocks(hptr_t block1, hptr_t block2) {
     assert(next_block(block1) == block2);
 
     uint32_t new_size = bk_size(block1) + sizeof(AllocBlockHeader) + bk_size(block2);
+
+    dbg_printf("Coalescing %d with %d -- Size of new block is %d", block1, block2, new_size);
 
     if (next_block(block2) != NULL_HPTR) {
         bk_set_prev_free(next_block(block2), bk_is_free(block1));
@@ -216,6 +221,8 @@ void* nalloc(size_t size) {
 
     size = ALIGN(sizeof(AllocBlockHeader) + size) - sizeof(AllocBlockHeader);
 
+    dbg_printf("Allocating %d bytes", size);
+
     hptr_t free_block = rbtree_find(rbtree, size);
 
     if (free_block != NULL_HPTR) {
@@ -226,6 +233,7 @@ void* nalloc(size_t size) {
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
         }
+        dbg_printf("[MALLOC]: Request for %d bytes sufficed with block %d", size, free_block);
         return (char*)mem_heap_lo() + free_block + sizeof(AllocBlockHeader);
     }
 
@@ -251,6 +259,7 @@ void* nalloc(size_t size) {
     if (res == (void*)-1) {
         return NULL;
     }
+    dbg_printf("[MALLOC]: Heap expanded by %d", expansion_size);
 
     if (is_last_bk_free) {
         bk_set_size(last_bk, bk_size(last_bk) + expansion_size);
@@ -268,12 +277,16 @@ void* nalloc(size_t size) {
         rbtree_insert(rbtree, leftover_bk);
     }
 
+    dbg_printf("[MALLOC]: Request for %d bytes sufficed with block %d", size, last_bk);
     return (char*)mem_heap_lo() + last_bk + sizeof(AllocBlockHeader);
 }
 
 void mm_free(void* ptr) {
+    
     // We need to reinstate metadata
-    hptr_t block = (uintptr_t)((char*)ptr - sizeof(AllocBlockHeader)) - (uintptr_t)mem_heap_lo(); 
+    hptr_t block = (uintptr_t)((char*)ptr - sizeof(AllocBlockHeader)) - (uintptr_t)mem_heap_lo();
+    dbg_printf("Freeing block %d", block);
+
     assert(!bk_is_free(block));
     bk_set_size(block, bk_size(block));
     bk_set_is_free(block, true);
@@ -307,6 +320,8 @@ void* mm_realloc(void* ptr, size_t size) {
     hptr_t pblock = prev_block(block);
     hptr_t nblock = next_block(block);
 
+    dbg_printf("Reallocating %d -- looking for size %d", block, size);
+
     uint32_t space_needed = sizeof(AllocBlockHeader) + size;
 
     /* -------------------------------- SHRINKING ------------------------------- */
@@ -319,6 +334,7 @@ void* mm_realloc(void* ptr, size_t size) {
             }
             rbtree_insert(rbtree, leftover_bk);
         }
+        dbg_printf("[REALLOC] Shrinked %d to %d", block, bk_size(block));
         return ptr;
     }
 
@@ -333,7 +349,8 @@ void* mm_realloc(void* ptr, size_t size) {
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
         }
-        // Return
+
+        dbg_printf("[REALLOC] Just expanded block. New size: %d", bk_size(block));
         return (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
     }
 
@@ -364,6 +381,7 @@ void* mm_realloc(void* ptr, size_t size) {
             rbtree_insert(rbtree, leftover_bk);
         }
 
+        dbg_printf("[REALLOC] Merged %d with %d and reallocated -- New size is: %d", block, pblock, bk_size(pblock));
         return pblock_uptr;
     }
 
@@ -389,6 +407,7 @@ void* mm_realloc(void* ptr, size_t size) {
         memmove(pblock_uptr, block_uptr, prev_size);
         bk_set_is_free(pblock, false);
 
+        dbg_printf("[REALLOC] Merged %d, %d, and %d -- New size: %d", pblock, block, nblock, bk_size(pblock));
         return (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
     }
 
@@ -398,5 +417,8 @@ void* mm_realloc(void* ptr, size_t size) {
         memcpy(new_ptr, ptr, bk_size(block));
         mm_free(ptr);
     }
+
+    dbg_printf("[REALLOC] Reallocated %d to %d",
+                block, (uintptr_t)mem_heap_lo() - (uintptr_t)new_ptr - sizeof(AllocBlockHeader));
     return new_ptr;
 }
