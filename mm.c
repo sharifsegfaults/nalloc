@@ -20,7 +20,8 @@ FreeBlockHeader* bk_free_header(hptr_t block) {
 }
 
 BlockFooter* bk_footer(hptr_t block) {
-    return (BlockFooter*)((char*)mem_heap_lo() + block + bk_size(block));
+    return (BlockFooter*)((char*)mem_heap_lo() + block + sizeof(AllocBlockHeader) + bk_size(block)
+                          - sizeof(BlockFooter));
 }
 
 uint32_t bk_size(hptr_t block) {
@@ -244,7 +245,7 @@ void* nalloc(size_t size) {
     // There is no free block :(
     uint32_t expansion_size = ALIGN(MAX(
         MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), sizeof(AllocBlockHeader) + size - recyclable_space),
-        sizeof(FreeBlockHeader) + sizeof(BlockFooter) - recyclable_space
+        sizeof(FreeBlockHeader) + sizeof(BlockFooter)
     ));
 
     void* res = mem_sbrk(expansion_size);
@@ -288,11 +289,10 @@ void mm_free(void* ptr) {
         coalesce_blocks(block, nblock);
     }
     if (bk_prev_free(block)) {
-        uint32_t prev_size = ((BlockFooter*)(((char*)mem_heap_lo() + block) - sizeof(BlockFooter)))->size;
-        hptr_t prev_block = block - prev_size - sizeof(AllocBlockHeader);
-        rbtree_remove(rbtree, prev_block);
-        coalesce_blocks(prev_block, block);
-        block = prev_block;
+        hptr_t pblock = prev_block(block);
+        rbtree_remove(rbtree, pblock);
+        coalesce_blocks(pblock, block);
+        block = pblock;
     }
 
     // Reinsert into rbtree
@@ -349,7 +349,7 @@ void* mm_realloc(void* ptr, size_t size) {
         char* block_uptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
         char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
         memmove(pblock_uptr, block_uptr, prev_size);
-        memcpy(bk_footer(pblock), &user_info_in_footer, sizeof(BlockFooter));
+        memcpy(pblock_uptr + prev_size - sizeof(BlockFooter), &user_info_in_footer, sizeof(BlockFooter));
 
         // Partition if necessary
         hptr_t leftover_bk = partition_if_worth_it(pblock, size);

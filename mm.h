@@ -41,7 +41,7 @@ extern void *mm_realloc(void *ptr, size_t size);
 typedef uint32_t hptr_t;
 #define NULL_HPTR UINT32_MAX
 
-#define ALIGNMENT alignof(max_align_t)
+#define ALIGNMENT (alignof(max_align_t))
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT-1))
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20

@@ -3,6 +3,8 @@
 
 #include "rbtree.h"
 
+#define S(x) ALIGN(x)
+
 static char* heap;
 hptr_t nb = 0;
 
@@ -28,14 +30,14 @@ hptr_t create_block(uint32_t size) {
     bk_set_parent(nb, NULL_HPTR);
     bk_set_color(nb, RED);
     bk_set_is_free(nb, true);
-    nb += sizeof(uint32_t) + size;
+    nb += sizeof(AllocBlockHeader) + size;
     return old_nb;
 }
 
 rbtree_t create_rbtree() {
     rbtree_t rbtree;
     uint32_t padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
-    uint32_t ghost_node_size = ALIGN(sizeof(BlockHeader) + sizeof(BlockFooter));
+    uint32_t ghost_node_size = ALIGN(sizeof(FreeBlockHeader) + sizeof(BlockFooter));
     mem_sbrk(padding + ghost_node_size);
     // Setup ghost node
     rbtree.block = padding;
@@ -47,13 +49,13 @@ rbtree_t create_rbtree() {
 }
 
 bool TEST_LEFT_ROTATION() {
-    hptr_t five = create_block(50 * 4);
-    hptr_t two = create_block(20 * 4);
-    hptr_t ten = create_block(100 * 4);
-    hptr_t eight = create_block(80 * 4);
-    hptr_t twelve = create_block(120 * 4);
-    hptr_t six = create_block(60 * 4);
-    hptr_t nine = create_block(90 * 4);
+    hptr_t five = create_block(S(50));
+    hptr_t two = create_block(S(20));
+    hptr_t ten = create_block(S(100));
+    hptr_t eight = create_block(S(80));
+    hptr_t twelve = create_block(S(120));
+    hptr_t six = create_block(S(60));
+    hptr_t nine = create_block(S(90));
 
     tlink(five, two, true);
     tlink(five, ten, false);
@@ -67,7 +69,7 @@ bool TEST_LEFT_ROTATION() {
     Node vectree[7] = {};
     rbtree_to_vec(res, vectree);
     int expected[] = {
-        100 * 4, 50 * 4, 20 * 4, 80 * 4, 60 * 4, 90 * 4, 120 * 4
+        S(100), S(50), S(20), S(80), S(60), S(90), S(120)
     };
 
     for (int i = 0; i < 7; ++i) {
@@ -78,13 +80,13 @@ bool TEST_LEFT_ROTATION() {
 }
 
 bool TEST_RIGHT_ROTATION() {
-    hptr_t five = create_block(50*4);
-    hptr_t two = create_block(20*4);
-    hptr_t ten = create_block(100*4);
-    hptr_t eight = create_block(80*4);
-    hptr_t twelve = create_block(120*4);
-    hptr_t six = create_block(60*4);
-    hptr_t nine = create_block(90*4);
+    hptr_t five = create_block(S(50));
+    hptr_t two = create_block(S(20));
+    hptr_t ten = create_block(S(100));
+    hptr_t eight = create_block(S(80));
+    hptr_t twelve = create_block(S(120));
+    hptr_t six = create_block(S(60));
+    hptr_t nine = create_block(S(90));
     
     tlink(ten, five, true);
     tlink(ten, twelve, false);
@@ -98,7 +100,7 @@ bool TEST_RIGHT_ROTATION() {
     Node vectree[7] = {};
     rbtree_to_vec(res, vectree);
     int expected[] = {
-        50 * 4, 20 * 4, 100 * 4, 80 * 4, 60 * 4, 90 * 4, 120 * 4
+        S(50), S(20), S(100), S(80), S(60), S(90), S(120)
     };
 
     for (int i = 0; i < 7; ++i) {
@@ -112,65 +114,65 @@ bool TEST_RIGHT_ROTATION() {
 bool TEST_INSERTION() {
     rbtree_t rbtree = create_rbtree();
 
-    rbtree_insert(rbtree, create_block(150 * 4));
+    rbtree_insert(rbtree, create_block(S(150)));
     assert(rbtree_eq_vec(rbtree, (Node[1]){
-        csnode(BLACK, 150 * 4)
+        csnode(BLACK, S(150))
     }, 1));
-    rbtree_insert(rbtree, create_block(50 * 4));
+    rbtree_insert(rbtree, create_block(S(50)));
     assert(rbtree_eq_vec(rbtree, (Node[2]){
-        csnode(BLACK, 150 * 4),
-        csnode(RED, 50 * 4)
+        csnode(BLACK, S(150)),
+        csnode(RED, S(50))
     }, 2));
-    rbtree_insert(rbtree, create_block(10 * 4));
+    rbtree_insert(rbtree, create_block(S(10)));
     assert(rbtree_eq_vec(rbtree, (Node[3]){
-        csnode(BLACK, 50 * 4),
-        csnode(RED, 10 * 4),
-        csnode(RED, 150 * 4)
+        csnode(BLACK, S(50)),
+        csnode(RED, S(10)),
+        csnode(RED, S(150))
     }, 3));
-    rbtree_insert(rbtree, create_block(120 * 4));
+    rbtree_insert(rbtree, create_block(S(120)));
     assert(rbtree_eq_vec(rbtree, (Node[4]){
-        csnode(BLACK, 50 * 4),
-        csnode(BLACK, 10 * 4),
-        csnode(BLACK, 150 * 4),
-        csnode(RED, 120 * 4)
+        csnode(BLACK, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(BLACK, S(150)),
+        csnode(RED, S(120))
     }, 4));
-    rbtree_insert(rbtree, create_block(130 * 4));
+    rbtree_insert(rbtree, create_block(S(130)));
     assert(rbtree_eq_vec(rbtree, (Node[5]){
-        csnode(BLACK, 50 * 4),
-        csnode(BLACK, 10 * 4),
-        csnode(BLACK, 130 * 4),
-        csnode(RED, 120 * 4),
-        csnode(RED, 150 * 4)
+        csnode(BLACK, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(BLACK, S(130)),
+        csnode(RED, S(120)),
+        csnode(RED, S(150))
     }, 5));
-    rbtree_insert(rbtree, create_block(170 * 4));
+    rbtree_insert(rbtree, create_block(S(170)));
     assert(rbtree_eq_vec(rbtree, (Node[6]){
-        csnode(BLACK, 50 * 4),
-        csnode(BLACK, 10 * 4),
-        csnode(RED, 130 * 4),
-        csnode(BLACK, 120 * 4),
-        csnode(BLACK, 150 * 4),
-        csnode(RED, 170 * 4)
+        csnode(BLACK, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(RED, S(130)),
+        csnode(BLACK, S(120)),
+        csnode(BLACK, S(150)),
+        csnode(RED, S(170))
     }, 6));
-    rbtree_insert(rbtree, create_block(190 * 4));
+    rbtree_insert(rbtree, create_block(S(190)));
     assert(rbtree_eq_vec(rbtree, (Node[7]){
-        csnode(BLACK, 50 * 4),
-        csnode(BLACK, 10 * 4),
-        csnode(RED, 130 * 4),
-        csnode(BLACK, 120 * 4),
-        csnode(BLACK, 170 * 4),
-        csnode(RED, 150 * 4),
-        csnode(RED, 190 * 4)
+        csnode(BLACK, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(RED, S(130)),
+        csnode(BLACK, S(120)),
+        csnode(BLACK, S(170)),
+        csnode(RED, S(150)),
+        csnode(RED, S(190))
     }, 7));
-    rbtree_insert(rbtree, create_block(210 * 4));
+    rbtree_insert(rbtree, create_block(S(210)));
     assert(rbtree_eq_vec(rbtree, (Node[8]){
-        csnode(BLACK, 130 * 4),
-        csnode(RED, 50 * 4),
-        csnode(BLACK, 10 * 4),
-        csnode(BLACK, 120 * 4),
-        csnode(RED, 170 * 4),
-        csnode(BLACK, 150 * 4),
-        csnode(BLACK, 190 * 4),
-        csnode(RED, 210 * 4)
+        csnode(BLACK, S(130)),
+        csnode(RED, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(BLACK, S(120)),
+        csnode(RED, S(170)),
+        csnode(BLACK, S(150)),
+        csnode(BLACK, S(190)),
+        csnode(RED, S(210))
     }, 8));
 
     return true;
@@ -179,29 +181,29 @@ bool TEST_INSERTION() {
 bool TEST_FIND() {
     rbtree_t rbtree = create_rbtree();
 
-    rbtree_insert(rbtree, create_block(150 * 4));
-    rbtree_insert(rbtree, create_block(50 * 4));
-    rbtree_insert(rbtree, create_block(10 * 4));
-    rbtree_insert(rbtree, create_block(120 * 4));
-    rbtree_insert(rbtree, create_block(130 * 4));
-    rbtree_insert(rbtree, create_block(170 * 4));
-    rbtree_insert(rbtree, create_block(190 * 4));
-    rbtree_insert(rbtree, create_block(210 * 4));
+    rbtree_insert(rbtree, create_block(S(150)));
+    rbtree_insert(rbtree, create_block(S(50)));
+    rbtree_insert(rbtree, create_block(S(10)));
+    rbtree_insert(rbtree, create_block(S(120)));
+    rbtree_insert(rbtree, create_block(S(130)));
+    rbtree_insert(rbtree, create_block(S(170)));
+    rbtree_insert(rbtree, create_block(S(190)));
+    rbtree_insert(rbtree, create_block(S(210)));
 
     // Check exact matches
-    int nums[8] = { 150*4, 50*4, 10*4, 120*4, 130*4, 170*4, 190*4, 210*4 };
+    int nums[8] = { S(150), S(50), S(10), S(120), S(130), S(170), S(190), S(210) };
     for (int i = 0; i < 8; ++i) {
         assert(bk_size(rbtree_find(rbtree, nums[i])) == nums[i]);
     }
 
     // Check if it returns lower bound when not an exact match
-    assert(bk_size(rbtree_find(rbtree, 110*4)) == 120*4);
-    assert(bk_size(rbtree_find(rbtree, 30*4)) == 50*4);
-    assert(bk_size(rbtree_find(rbtree, 140*4)) == 150*4);
-    assert(rbtree_find(rbtree, 140000*4) == NULL_HPTR);
-    assert(bk_size(rbtree_find(rbtree, 0*4)) == 10*4);
-    assert(bk_size(rbtree_find(rbtree, 180*4)) == 190*4);
-    assert(bk_size(rbtree_find(rbtree, 200*4)) == 210*4);
+    assert(bk_size(rbtree_find(rbtree, S(110))) == S(120));
+    assert(bk_size(rbtree_find(rbtree, S(30))) == S(50));
+    assert(bk_size(rbtree_find(rbtree, S(140))) == S(150));
+    assert(rbtree_find(rbtree, S(140000)) == NULL_HPTR);
+    assert(bk_size(rbtree_find(rbtree, S(0))) == S(10));
+    assert(bk_size(rbtree_find(rbtree, S(180))) == S(190));
+    assert(bk_size(rbtree_find(rbtree, S(200))) == S(210));
 
     return true;
 }
@@ -209,14 +211,14 @@ bool TEST_FIND() {
 bool TEST_REMOVE() {
     rbtree_t rbtree = create_rbtree();
 
-    hptr_t fifteen = create_block(150 * 4);
-    hptr_t five = create_block(50 * 4);
-    hptr_t one = create_block(10 * 4);
-    hptr_t twelve = create_block(120 * 4);
-    hptr_t thirteen = create_block(130 * 4);
-    hptr_t seventeen = create_block(170 * 4);
-    hptr_t nineteen = create_block(190 * 4);
-    hptr_t twentyone = create_block(210 * 4);
+    hptr_t fifteen = create_block(S(150));
+    hptr_t five = create_block(S(50));
+    hptr_t one = create_block(S(10));
+    hptr_t twelve = create_block(S(120));
+    hptr_t thirteen = create_block(S(130));
+    hptr_t seventeen = create_block(S(170));
+    hptr_t nineteen = create_block(S(190));
+    hptr_t twentyone = create_block(S(210));
 
     rbtree_insert(rbtree, fifteen);
     rbtree_insert(rbtree, five);
@@ -229,58 +231,58 @@ bool TEST_REMOVE() {
 
     rbtree_remove(rbtree, fifteen);
     assert(rbtree_eq_vec(rbtree, (Node[7]){
-        csnode(BLACK, 130*4),
-        csnode(RED, 50*4),
-        csnode(BLACK, 10*4),
-        csnode(BLACK, 120*4),
-        csnode(RED, 190*4),
-        csnode(BLACK, 170*4),
-        csnode(BLACK, 210*4)
+        csnode(BLACK, S(130)),
+        csnode(RED, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(BLACK, S(120)),
+        csnode(RED, S(190)),
+        csnode(BLACK, S(170)),
+        csnode(BLACK, S(210))
     }, 7));
 
     rbtree_remove(rbtree, nineteen);
     assert(rbtree_eq_vec(rbtree, (Node[6]){
-        csnode(BLACK, 130*4),
-        csnode(RED, 50*4),
-        csnode(BLACK, 10*4),
-        csnode(BLACK, 120*4),
-        csnode(BLACK, 210*4),
-        csnode(RED, 170*4)
+        csnode(BLACK, S(130)),
+        csnode(RED, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(BLACK, S(120)),
+        csnode(BLACK, S(210)),
+        csnode(RED, S(170))
     }, 6));
 
     rbtree_remove(rbtree, thirteen);
     assert(rbtree_eq_vec(rbtree, (Node[5]){
-        csnode(BLACK, 170*4),
-        csnode(RED, 50*4),
-        csnode(BLACK, 10*4),
-        csnode(BLACK, 120*4),
-        csnode(BLACK, 210*4)
+        csnode(BLACK, S(170)),
+        csnode(RED, S(50)),
+        csnode(BLACK, S(10)),
+        csnode(BLACK, S(120)),
+        csnode(BLACK, S(210))
     }, 5));
 
     rbtree_remove(rbtree, one);
     assert(rbtree_eq_vec(rbtree, (Node[4]){
-        csnode(BLACK, 170*4),
-        csnode(BLACK, 50*4),
-        csnode(RED, 120*4),
-        csnode(BLACK, 210*4)
+        csnode(BLACK, S(170)),
+        csnode(BLACK, S(50)),
+        csnode(RED, S(120)),
+        csnode(BLACK, S(210))
     }, 4));
 
     rbtree_remove(rbtree, seventeen);
     assert(rbtree_eq_vec(rbtree, (Node[3]){
-        csnode(BLACK, 120*4),
-        csnode(BLACK, 50*4),
-        csnode(BLACK, 210*4)
+        csnode(BLACK, S(120)),
+        csnode(BLACK, S(50)),
+        csnode(BLACK, S(210))
     }, 3));
 
     rbtree_remove(rbtree, twelve);
     assert(rbtree_eq_vec(rbtree, (Node[2]){
-        csnode(BLACK, 210*4),
-        csnode(RED, 50*4)
+        csnode(BLACK, S(210)),
+        csnode(RED, S(50))
     }, 2));
 
     rbtree_remove(rbtree, five);
     assert(rbtree_eq_vec(rbtree, (Node[1]){
-        csnode(BLACK, 210*4)
+        csnode(BLACK, S(210))
     }, 1));
 
     rbtree_remove(rbtree, twentyone);
