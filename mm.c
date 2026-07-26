@@ -230,6 +230,8 @@ void coalesce_blocks(hptr_t block1, hptr_t block2) {
     assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
     assert(bk_is_free(block1) || bk_is_free(block2));
     assert(next_block(block1) == block2);
+    uint32_t ogsize1 = bk_size(block1);
+    uint32_t ogsize2 = bk_size(block2);
     /* -------------------------------------------------------------------------- */
     uint32_t new_size = bk_size(block1) + sizeof(AllocBlockHeader) + bk_size(block2);
 
@@ -243,7 +245,8 @@ void coalesce_blocks(hptr_t block1, hptr_t block2) {
 
     bk_set_size(block1, new_size);
     /* -------------------------------------------------------------------------- */
-    assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
+    assert(IS_VALID_BLOCK(block1));
+    assert(bk_size(block1) >= ogsize1 + ogsize2);
 }
 
 int mm_init() {
@@ -353,22 +356,23 @@ void mm_free(void* ptr) {
     // We need to reinstate metadata
     hptr_t block = (uintptr_t)((char*)ptr - sizeof(AllocBlockHeader)) - (uintptr_t)mem_heap_lo();
     dbg_printf("Freeing block %d", block);
-
+    assert(IS_VALID_BLOCK(block));
     assert(!bk_is_free(block));
+
     bk_set_size(block, bk_size(block));
     bk_set_is_free(block, true);
-    // * No need to set prev_free since it is part of size
+    // * No need to set prev_free since it is part of size so it hasn't been overwritten
 
     // Coalescing
     // ! Order matters
     hptr_t nblock = next_block(block);
+    hptr_t pblock = prev_block(block);
 
     if (nblock != NULL_HPTR && bk_is_free(nblock)) {
         rbtree_remove(rbtree, nblock);
         coalesce_blocks(block, nblock);
     }
-    if (bk_prev_free(block)) {
-        hptr_t pblock = prev_block(block);
+    if (pblock != NULL_HPTR && bk_is_free(pblock)) {
         rbtree_remove(rbtree, pblock);
         coalesce_blocks(pblock, block);
         block = pblock;
@@ -377,6 +381,10 @@ void mm_free(void* ptr) {
     // Reinsert into rbtree
     bk_set_is_free(block, true);
     rbtree_insert(rbtree, block);
+    /* -------------------------------------------------------------------------- */
+    assert(bk_is_free(block));
+    assert(next_block(block) == NULL_HPTR || !bk_is_free(next_block(block)));
+    assert(prev_block(block) == NULL_HPTR || !bk_is_free(prev_block(block)));
 }
 
 void* mm_realloc(void* ptr, size_t size) {
