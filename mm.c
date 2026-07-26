@@ -195,6 +195,7 @@ hptr_t partition_block(hptr_t block, uint32_t size_needed) {
     }
 
     assert(IS_VALID_BLOCK(block));
+    assert(bk_size(block) >= size_needed);
     assert(IS_VALID_BLOCK(right_bk));
 
     return right_bk;
@@ -289,8 +290,11 @@ void* nalloc(size_t size) {
         hptr_t leftover_bk = partition_if_worth_it(free_block, size);
 
         if (leftover_bk != NULL_HPTR) {
+            assert(IS_VALID_BLOCK(leftover_bk));
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
+            assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
+            assert(prev_block(leftover_bk) == NULL_HPTR || !bk_is_free(prev_block(leftover_bk)));
         }
 
         dbg_printf("[MALLOC]: Request for %d bytes sufficed with block %d", size, free_block);
@@ -343,6 +347,8 @@ void* nalloc(size_t size) {
         assert(IS_VALID_BLOCK(leftover_bk));
         bk_set_is_free(leftover_bk, true);
         rbtree_insert(rbtree, leftover_bk);
+        assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
+        assert(prev_block(leftover_bk) == NULL_HPTR || !bk_is_free(prev_block(leftover_bk)));
     }
 
     dbg_printf("[MALLOC]: Request for %d bytes sufficed with block %d", size, last_bk);
@@ -394,6 +400,7 @@ void* mm_realloc(void* ptr, size_t size) {
     hptr_t pblock = prev_block(block);
     hptr_t nblock = next_block(block);
 
+    assert(IS_VALID_BLOCK(block));
     dbg_printf("Reallocating %d -- looking for size %d", block, size);
 
     uint32_t space_needed = sizeof(AllocBlockHeader) + size;
@@ -402,34 +409,50 @@ void* mm_realloc(void* ptr, size_t size) {
     if (bk_size(block) >= size) {
         hptr_t leftover_bk = partition_if_worth_it(block, size);
         if (leftover_bk != NULL_HPTR) {
+            assert(IS_VALID_BLOCK(leftover_bk));
             if (nblock != NULL_HPTR && bk_is_free(nblock)) {
                 rbtree_remove(rbtree, nblock);
                 coalesce_blocks(leftover_bk, nblock);
             }
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
+            assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
+            assert(prev_block(leftover_bk) == NULL_HPTR || !bk_is_free(prev_block(leftover_bk)));
         }
         dbg_printf("[REALLOC] Shrinked %d to %d", block, bk_size(block));
+        assert(IS_VALID_BLOCK(block));
+        assert(!bk_is_free(block));
+        assert(bk_size(block) >= size);
         return ptr;
     }
 
     /* -------------------------------- EXPANDING ------------------------------- */
     if (nblock != NULL_HPTR && bk_is_free(nblock) && bk_size(block) + sizeof(AllocBlockHeader) + bk_size(nblock) >= size) {
+        assert(IS_VALID_BLOCK(nblock));
+        /* -------------------------------------------------------------------------- */
         // Merge the two together
         rbtree_remove(rbtree, nblock);
         coalesce_blocks(block, nblock);
         // Partition if necessary
         hptr_t leftover_bk =  partition_if_worth_it(block, size);
         if (leftover_bk != NULL_HPTR) {
+            assert(IS_VALID_BLOCK(leftover_bk));
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
+            assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
+            assert(prev_block(leftover_bk) == NULL_HPTR || !bk_is_free(prev_block(leftover_bk)));
         }
 
         dbg_printf("[REALLOC] Just expanded block. New size: %d", bk_size(block));
+        assert(IS_VALID_BLOCK(block));
+        assert(!bk_is_free(block));
+        assert(bk_size(block) >= size);
         return (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
     }
 
     if (pblock != NULL_HPTR && bk_is_free(pblock) && bk_size(pblock) + sizeof(AllocBlockHeader) + bk_size(block) >= size) {
+        assert(IS_VALID_BLOCK(pblock));
+        /* -------------------------------------------------------------------------- */
         uint32_t prev_size = bk_size(block);
         // Merge the two together
         rbtree_remove(rbtree, pblock);
@@ -447,23 +470,31 @@ void* mm_realloc(void* ptr, size_t size) {
         // Partition if necessary
         hptr_t leftover_bk = partition_if_worth_it(pblock, size);
         if (leftover_bk != NULL_HPTR) {
+            assert(IS_VALID_BLOCK(leftover_bk));
             // Check if we need to coalesce with right block
             if (bk_is_free(nblock)) {
                 rbtree_remove(rbtree, nblock);
-                bk_set_is_free(block, true);
                 coalesce_blocks(leftover_bk, nblock);
             }
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
+            assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
+            assert(prev_block(leftover_bk) == NULL_HPTR || !bk_is_free(prev_block(leftover_bk)));
         }
 
         dbg_printf("[REALLOC] Merged %d with %d and reallocated -- New size is: %d", block, pblock, bk_size(pblock));
+        assert(IS_VALID_BLOCK(pblock));
+        assert(!bk_is_free(pblock));
+        assert(bk_size(pblock) >= size);
         return pblock_uptr;
     }
 
     if (pblock != NULL_HPTR && nblock != NULL_HPTR
     && bk_is_free(pblock) && bk_is_free(nblock)
     && bk_size(pblock) + 2*sizeof(AllocBlockHeader) + bk_size(block) + bk_size(nblock) >= size) {
+        assert(IS_VALID_BLOCK(pblock));
+        assert(IS_VALID_BLOCK(nblock));
+        /* -------------------------------------------------------------------------- */
         uint32_t prev_size = bk_size(block);
 
         rbtree_remove(rbtree, pblock);
@@ -474,8 +505,11 @@ void* mm_realloc(void* ptr, size_t size) {
 
         hptr_t leftover_bk = partition_if_worth_it(pblock, size);
         if (leftover_bk != NULL_HPTR) {
+            assert(IS_VALID_BLOCK(leftover_bk));
             bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
+            assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
+            assert(prev_block(leftover_bk) == NULL_HPTR || !bk_is_free(prev_block(leftover_bk)));
         }
 
         char* block_uptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
@@ -484,6 +518,9 @@ void* mm_realloc(void* ptr, size_t size) {
         bk_set_is_free(pblock, false);
 
         dbg_printf("[REALLOC] Merged %d, %d, and %d -- New size: %d", pblock, block, nblock, bk_size(pblock));
+        assert(IS_VALID_BLOCK(pblock));
+        assert(!bk_is_free(pblock));
+        assert(bk_size(pblock) >= size);
         return (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
     }
 
