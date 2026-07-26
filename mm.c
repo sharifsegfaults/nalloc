@@ -344,6 +344,7 @@ void* mm_realloc(void* ptr, size_t size) {
         BlockFooter user_info_in_footer;
         memcpy(&user_info_in_footer, bk_footer(block), sizeof(BlockFooter));
         coalesce_blocks(pblock, block);
+        bk_set_is_free(pblock, false);
 
         // Copy the user's info
         char* block_uptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
