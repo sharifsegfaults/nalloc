@@ -13,16 +13,18 @@ bool TEST_PARTITION_BLOCK() {
 }
 
 bool TEST_MALLOC() {
+    printf("Starting MALLOC Test...\n");
     mm_init();
     char* a1 = nalloc(23);
     strcpy(a1, "This is 23 bytes long!");
     char* a2 = nalloc(42);
     strcpy(a2, "This is 23 bytes long... Oh wait, it's 42");
-    
+    printf("... Finished MALLOC Test\n");
     return true;
 }
 
 bool TEST_FREE_1() {
+    printf("Starting FREE_1 Test...\n");
     mm_init();
     char* a1 = nalloc(23);
     strcpy(a1, "This is 23 bytes long!");
@@ -36,12 +38,14 @@ bool TEST_FREE_1() {
     char* a4 = nalloc(49);
     strcpy(a4, "This is once again 45 characters or something...");
     mm_free(a4);
+    printf("... Finished FREE_1 Test\n");
 
     return true;
 }
 
 // Coalescing
 bool TEST_FREE_2() {
+    printf("Starting FREE_2 Test...\n");
     mm_init();
     // Coalesce right
     char* p1 = nalloc(24);
@@ -65,12 +69,14 @@ bool TEST_FREE_2() {
     mm_free(p3);
     mm_free(p1);
     mm_free(p2);
+    printf("... Finished FREE_2 Test\n");
 
     return true;
 }
 
 // Test for realloc: realloc on a scenario where there is enough space, but only once the block is freed
 bool TEST_REALLOC_1() {
+    printf("Starting REALLOC_1 Test...\n");
     mm_init();
     char* p1 = nalloc(40);
     char* p2 = nalloc(40);
@@ -88,11 +94,14 @@ bool TEST_REALLOC_1() {
     // Expect p2 merged with p3 -- plus some extra space
     strcpy(p2_, "52 bytes are represented in this beautiful string!! and now this");
     mm_realloc(p2_, 84);
+    printf("... Finished REALLOC_1 Test\n");
 
     return true;
 }
 
 bool TEST_REALLOC_2() {
+    printf("... Starting REALLOC_2 Test\n");
+
     mm_init();
     char* p1 = nalloc(40);
     char* p2 = nalloc(40);
@@ -111,10 +120,12 @@ bool TEST_REALLOC_2() {
     assert(p2__ == p2_);
     strcpy(p2__, "This is a 40 byte long message... nevermind, it's actually 110... or I think... :) kjashdjkahsjkdhaksdaaaaaaa");
 
+    printf("... Finished REALLOC_2 Test\n");
     return true;
 }
 
 bool TEST_REALLOC_SHRINK() {
+    printf("Starting REALLOC_SHRINK Test...\n");
     mm_init();
 
     char* p1 = nalloc(64);
@@ -127,7 +138,7 @@ bool TEST_REALLOC_SHRINK() {
 
     char* p3 = nalloc(128);
     strcpy(p3, "128 bytes, that's a lot of information... not sure how we are going to fill that up with a single string and allocation... bye!");
-
+    printf("... Finished REALLOC_SHRINK Test\n");
     return true;
 }
 

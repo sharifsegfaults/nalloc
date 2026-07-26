@@ -1,8 +1,9 @@
 ## TODO
 
 - [X] Add logs to events (i.e., tree rotations, insertions, free's, coalescings, etc.)
-- [ ] Add a bunch of asserts
+- [X] Add a bunch of asserts -- also to rbtree?
 - [ ] Get rid of magic numbers
+- [ ] Beautify the code :)
 
 ### Postponed
 - Create heapchecker:

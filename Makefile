@@ -1,4 +1,4 @@
-FLAGS := -g
+FLAGS := -g -DDEBUG
 
 all: nalloc
 
@@ -9,4 +9,4 @@ rbtree_test: memlib.c mm.c rbtree.c rbtree_test.c
 	gcc $^ -o bins/$@ ${FLAGS}
 
 clean:
-	rm -rf nalloc.o mm_test.o
+	rm -rf bins/mm_test bins/rbtree_test

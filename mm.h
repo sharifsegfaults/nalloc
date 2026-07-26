@@ -76,7 +76,7 @@ extern void bk_set_is_free(hptr_t block, bool is_free);
 
 /* ----------------------------- BLOCK NEIGHBOURS ---------------------------- */
 extern hptr_t next_block(hptr_t block);
-extern hptr_t prev_block(hptr_t block);
+extern hptr_t prev_block_if_free(hptr_t block);
 
 /* ---------------------------------- TEMP ---------------------------------- */
 extern hptr_t partition_block(hptr_t block, uint32_t size_needed);
