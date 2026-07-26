@@ -9,35 +9,6 @@
 
 #include "memlib.h"
 
-extern int mm_init (void);
-
-/**
- * @brief Allocate `size` bytes
- * 
- * @returns Pointer to memory section containing at least `size` modifiable bytes
- */
-extern void *nalloc (size_t size);
-
-/**
- * @brief Frees a previously allocated memory block.
- * 
- * @param ptr  Pointer to block to be freed. Must be a pointer returned by a previous call to nalloc
- */
-extern void mm_free (void *ptr);
-
-/**
- * @brief Reallocates the information in memory block pointed to by `ptr` to
- * a new memory block of size at least `size`
- * 
- * @param size Size of the new memory block
- * 
- * @returns Pointer to the new memory block
- */
-extern void *mm_realloc(void *ptr, size_t size);
-
-/* -------------------------------------------------------------------------- */
-/*                                   CUSTOM                                   */
-/* -------------------------------------------------------------------------- */
 typedef uint32_t hptr_t;
 #define NULL_HPTR UINT32_MAX
 
@@ -45,6 +16,12 @@ typedef uint32_t hptr_t;
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT-1))
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20
+
+#ifdef DEBUG
+#define dbg_printf printf
+#else
+#define dbg_printf(...)
+#endif
 
 typedef enum : uint8_t {
     RED = 0,
@@ -103,3 +80,33 @@ extern hptr_t prev_block(hptr_t block);
 
 /* ---------------------------------- TEMP ---------------------------------- */
 extern hptr_t partition_block(hptr_t block, uint32_t size_needed);
+
+/* -------------------------------------------------------------------------- */
+/*                               MAIN FUNCTIONS                               */
+/* -------------------------------------------------------------------------- */
+
+extern int mm_init (void);
+
+/**
+ * @brief Allocate `size` bytes
+ * 
+ * @returns Pointer to memory section containing at least `size` modifiable bytes
+ */
+extern void *nalloc (size_t size);
+
+/**
+ * @brief Frees a previously allocated memory block.
+ * 
+ * @param ptr  Pointer to block to be freed. Must be a pointer returned by a previous call to nalloc
+ */
+extern void mm_free (void *ptr);
+
+/**
+ * @brief Reallocates the information in memory block pointed to by `ptr` to
+ * a new memory block of size at least `size`
+ * 
+ * @param size Size of the new memory block
+ * 
+ * @returns Pointer to the new memory block
+ */
+extern void *mm_realloc(void *ptr, size_t size);
