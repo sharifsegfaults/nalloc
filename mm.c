@@ -145,13 +145,27 @@ hptr_t partition_block(hptr_t block, uint32_t size_needed) {
 
     assert(total_right_space >= sizeof(FreeBlockHeader) + sizeof(BlockFooter));
 
-    hptr_t right_bk = block + total_left_space;
+    hptr_t right_bk = block + total_left_space;\
+
+    // ! Try to store the important state you need in variables because all of the block-moving
+    // ! and block manipulation changes temporarily metadata (like prev_free of some block could
+    // ! temporarily be pointing at the wrong thing)
+    bool is_free_block = bk_is_free(block);
 
     
     bk_set_size(right_bk, total_right_space - sizeof(AllocBlockHeader));
-    bk_set_prev_free(right_bk, bk_is_free(block));
+    bk_set_prev_free(right_bk, is_free_block);
     bk_set_is_free(right_bk, true);
-    bk_set_size(block, size_needed);
+    // If it's allocated we don't want to override the footer 
+    if (!is_free_block) {
+        BlockFooter user_info_in_new_footer;
+        char* new_footer_ptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader) + size_needed - sizeof(BlockFooter);
+        memcpy(&user_info_in_new_footer, new_footer_ptr, sizeof(BlockFooter));
+        bk_set_size(block, size_needed);
+        memcpy(bk_footer(block), &user_info_in_new_footer, sizeof(BlockFooter));
+    } else {
+        bk_set_size(block, size_needed);
+    }
 
     return right_bk;
 }
