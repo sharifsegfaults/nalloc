@@ -114,6 +114,23 @@ bool TEST_REALLOC_2() {
     return true;
 }
 
+bool TEST_REALLOC_SHRINK() {
+    mm_init();
+
+    char* p1 = nalloc(64);
+    strcpy(p1, "Hello everybody, this is 40 bytes long! Nope, it's 64 instead..");
+    char* p2 = nalloc(64);
+    strcpy(p2, "This is p2's thoughts. the end is near! Nope, it's 64 instead..");
+
+    char* p1_ = mm_realloc(p1, 24);
+    mm_free(p2);
+
+    char* p3 = nalloc(128);
+    strcpy(p3, "128 bytes, that's a lot of information... not sure how we are going to fill that up with a single string and allocation... bye!");
+
+    return true;
+}
+
 int main() {
     heap = malloc(1 * 1024);
     mem_init(heap, 1 * 1024);
@@ -122,5 +139,6 @@ int main() {
     TEST_FREE_2();
     TEST_REALLOC_1();
     TEST_REALLOC_2();
+    TEST_REALLOC_SHRINK();
     return 0;
 }

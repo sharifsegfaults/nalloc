@@ -317,6 +317,7 @@ void* mm_realloc(void* ptr, size_t size) {
                 rbtree_remove(rbtree, nblock);
                 coalesce_blocks(leftover_bk, nblock);
             }
+            bk_set_is_free(leftover_bk, true);
             rbtree_insert(rbtree, leftover_bk);
         }
         return ptr;
