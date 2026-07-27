@@ -519,7 +519,7 @@ void* nrealloc(void* ptr, size_t size) {
         if (leftover_bk != NULL_HPTR) {
             assert(IS_VALID_BLOCK(leftover_bk));
             // Check if we need to coalesce with right block
-            if (bk_is_free(nblock)) {
+            if (nblock != NULL_HPTR && bk_is_free(nblock)) {
                 rbtree_remove(rbtree, nblock);
                 coalesce_blocks(leftover_bk, nblock);
             }
