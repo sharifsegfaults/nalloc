@@ -133,7 +133,24 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
         bk_set_color(heir, tmp);
     }
 
-    // Getting rid of double black
+    assert(bk_left(block) == NULL_HPTR || bk_right(block) == NULL_HPTR);
+    
+    // If the node to delete is NOT a leaf node, then we just do normal BST deletion
+    if (bk_left(block) != NULL_HPTR) {
+        assert(bk_color(block) != RED || bk_color(bk_left(block)) != RED);
+        bk_set_color(bk_left(block), BLACK);
+        tlink(bk_parent(block), bk_left(block), is_lc(block));
+        return;
+    }
+
+    if (bk_right(block) != NULL_HPTR) {
+        assert(bk_color(block) != RED || bk_color(bk_right(block)) != RED);
+        bk_set_color(bk_right(block), BLACK);
+        tlink(bk_parent(block), bk_right(block), is_lc(block));
+        return;
+    }
+
+    // The node is a leaf node -- we fight to get rid of double black
     // ! block is now thought of as the double black node
     bool is_db_nil = true;
     while (true) {
