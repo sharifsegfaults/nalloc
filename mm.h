@@ -18,7 +18,7 @@ typedef uint32_t hptr_t;
 
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20
-#define MIN_BLOCK_SIZE sizeof(FreeBlockHeader) + sizeof(BlockFooter) - sizeof(AllocBlockHeader)
+#define MIN_BLOCK_SIZE (ALIGN(sizeof(FreeBlockHeader) + sizeof(BlockFooter) - sizeof(AllocBlockHeader)))
 
 #ifdef DEBUG
 #define dbg_printf printf

@@ -17,13 +17,16 @@ uint32_t padding;
 /* -------------------------------------------------------------------------- */
 FreeBlockHeader* bk_free_header(hptr_t block) {
     assert(block != NULL_HPTR);
-    return ((FreeBlockHeader*)((char*)mem_heap_lo() + block));
+    return (FreeBlockHeader*)BK_TO_PTR(block);
 }
 
 BlockFooter* bk_footer(hptr_t block) {
     assert(block != NULL_HPTR);
-    return (BlockFooter*)((char*)mem_heap_lo() + block + sizeof(AllocBlockHeader) + bk_size(block) -
-                          sizeof(BlockFooter));
+    // clang-format off
+    return (BlockFooter*)(
+        BK_TO_PTR(block) + sizeof(AllocBlockHeader) + bk_size(block) - sizeof(BlockFooter)
+    );
+    // clang-format on
 }
 
 uint32_t bk_size(hptr_t block) {
@@ -290,7 +293,7 @@ void* nalloc(size_t size) {
     // Lazy initialization
     if (rbtree.block == NULL_HPTR) {
         padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
-        void* res = mem_sbrk(padding + MIN_BLOCK_SIZE);
+        void* res = mem_sbrk(padding + sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE);
         if (res == (void*)-1) {
             return NULL;
         }
@@ -386,6 +389,7 @@ void* nalloc(size_t size) {
     assert(IS_VALID_BLOCK(last_bk));
     assert(!bk_is_free(last_bk));
     assert(bk_size(last_bk) >= size);
+    print_heap();
     return (char*)mem_heap_lo() + last_bk + sizeof(AllocBlockHeader);
 }
 

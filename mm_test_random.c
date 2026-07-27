@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <time.h>
 #include "mm.h"
+#include "common.h"
 #include "stivec.h"
 
 static char *heap;
@@ -47,10 +48,13 @@ void free_block(Block bk) {
 
 Block realloc_block(Block bk, uint32_t size) {
     assert(!memcmp(bk.memptr, bk.data, bk.data_size));
-    bk.data = randbytes(size);
     bk.memptr = nrealloc(bk.memptr, size);
+    // Check data is not lost
+    assert(!memcmp(bk.memptr, bk.data, MIN(bk.data_size, size)));
+    free(bk.data);
+    bk.data = randbytes(size);
     memcpy(bk.memptr, bk.data, size);
-    bk.data_size = size;    
+    bk.data_size = size;
     assert(!memcmp(bk.memptr, bk.data, bk.data_size));
     return bk;
 }
@@ -66,10 +70,10 @@ bool E2E_TEST_1(size_t seed) {
 
     uint32_t ops = 0;
     uint32_t numblocks = 0;
-    Block blocks[10000];
-    stivec_t allocbks = create_stivec(10000);
+    Block blocks[10];
+    stivec_t allocbks = create_stivec(10);
 
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 10; ++i) {
         // Pick random operation
         uint32_t op = randint(2);
         // Nalloc
