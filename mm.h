@@ -14,11 +14,11 @@ typedef uint32_t hptr_t;
 
 #define ALIGNMENT (alignof(max_align_t))
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT - 1))
+#define BK_TO_PTR(block) ((char*)mem_heap_lo() + block)
 
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20
 #define MIN_BLOCK_SIZE sizeof(FreeBlockHeader) + sizeof(BlockFooter) - sizeof(AllocBlockHeader)
-#define BK_TO_PTR(block) ((char*)mem_heap_lo() + block)
 
 #ifdef DEBUG
 #define dbg_printf printf

@@ -145,14 +145,12 @@ hptr_t prev_block_if_free(hptr_t block) {
 /*                                 ASSERTIONS                                 */
 /* -------------------------------------------------------------------------- */
 bool IS_VALID_BLOCK(hptr_t block) {
-    return (
-        block != NULL_HPTR
-        // Last byte of block is within the heap
-        && block + sizeof(AllocBlockHeader) + bk_size(block) - 1 < mem_heapsize()
-        // Whenever block is free, footer is present
-        && (bk_is_free(block) ? (bk_size(block) == bk_footer(block)->size) : true)
-        && bk_size(block) >= MIN_BLOCK_SIZE
-    );
+    return (block != NULL_HPTR
+            // Last byte of block is within the heap
+            && block + sizeof(AllocBlockHeader) + bk_size(block) - 1 < mem_heapsize()
+            // Whenever block is free, footer is present
+            && (bk_is_free(block) ? (bk_size(block) == bk_footer(block)->size) : true) &&
+            bk_size(block) >= MIN_BLOCK_SIZE);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -236,7 +234,7 @@ static hptr_t partition_block(hptr_t block, uint32_t size_needed) {
 
 /**
  * @brief Partitions block only if the leftover block is at least PARTITION_THRESHOLD bytes long
- * 
+ *
  * @returns leftover block. NULL_HPTR if none.
  */
 static hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
@@ -261,7 +259,7 @@ static hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
 /**
  * @pre block1 is to the left of block2, both are free blocks, and both have been removed
  * from the rbtree
- * 
+ *
  * @post Only the header and footer of block1 and block2 will be modified
  */
 void coalesce_blocks(hptr_t block1, hptr_t block2) {
@@ -292,26 +290,19 @@ void* nalloc(size_t size) {
     // Lazy initialization
     if (rbtree.block == NULL_HPTR) {
         padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
-        uint32_t ghost_node_size = ALIGN(sizeof(FreeBlockHeader) + sizeof(BlockFooter));
-        void* res = mem_sbrk(padding + ghost_node_size);
+        void* res = mem_sbrk(padding + MIN_BLOCK_SIZE);
         if (res == (void*)-1) {
             return NULL;
         }
         // Setup ghost node
-        // ! Other parts of the program (prev_block()) rely on the ghost node being the first node
-        // ! (in terms of heap arrangement)
         rbtree.block = padding;
-        bk_set_left(rbtree.block, NULL_HPTR);
-        bk_set_size(
-            rbtree.block,
-            ghost_node_size - sizeof(AllocBlockHeader));  // ! Ghost node must still be represented by a valid node
+        bk_set_left(rbtree.block, NULL_HPTR);  // left child of ghost node stores the root
+        bk_set_size(rbtree.block, MIN_BLOCK_SIZE);
         bk_set_prev_free(rbtree.block, false);
     }
-
     assert(rbtree.block == padding);
     /* -------------------------------------------------------------------------- */
-    size = ALIGN(sizeof(AllocBlockHeader) + size) - sizeof(AllocBlockHeader);
-
+    size = ALIGN(size);
     dbg_printf("Allocating %zu bytes\n", size);
 
     hptr_t free_block = rbtree_find(rbtree, size);
@@ -321,8 +312,8 @@ void* nalloc(size_t size) {
 
         rbtree_remove(rbtree, free_block);
         bk_set_is_free(free_block, false);
-        hptr_t leftover_bk = partition_if_worth_it(free_block, size);
 
+        hptr_t leftover_bk = partition_if_worth_it(free_block, size);
         if (leftover_bk != NULL_HPTR) {
             assert(IS_VALID_BLOCK(leftover_bk));
             bk_set_is_free(leftover_bk, true);
@@ -335,16 +326,16 @@ void* nalloc(size_t size) {
         assert(IS_VALID_BLOCK(free_block));
         assert(!bk_is_free(free_block));
         assert(bk_size(free_block) >= size);
-        print_heap();
         return (char*)mem_heap_lo() + free_block + sizeof(AllocBlockHeader);
     }
 
+    // There is no free block to accomodate this request :(
     bool is_last_bk_free = bk_prev_free(rbtree.block);
     hptr_t last_bk = NULL_HPTR;
     uint32_t recyclable_space = 0;
 
     if (is_last_bk_free) {
-        uint32_t last_bk_size = ((BlockFooter*)((char*)mem_heap_hi() - 3))->size;
+        uint32_t last_bk_size = ((BlockFooter*)((char*)mem_heap_hi() - sizeof(BlockFooter) + 1))->size;
         last_bk = mem_heapsize() - last_bk_size - sizeof(AllocBlockHeader);
         assert(IS_VALID_BLOCK(last_bk));
         assert(next_block(last_bk) == NULL_HPTR);
@@ -353,10 +344,15 @@ void* nalloc(size_t size) {
         rbtree_remove(rbtree, last_bk);
     }
 
-    // There is no free block :(
+    // clang-format off
     uint32_t expansion_size = ALIGN(
-        MAX(MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), sizeof(AllocBlockHeader) + size - recyclable_space),
-            sizeof(FreeBlockHeader) + sizeof(BlockFooter)));
+        MAX(
+            (uint32_t)(EXPANSION_FACTOR * mem_heapsize()),
+            sizeof(AllocBlockHeader) + size - recyclable_space,
+            sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE
+        )
+    );
+    // clang-format on
 
     void* res = mem_sbrk(expansion_size);
     if (res == (void*)-1) {
@@ -376,6 +372,7 @@ void* nalloc(size_t size) {
     }
 
     bk_set_is_free(last_bk, false);
+
     hptr_t leftover_bk = partition_if_worth_it(last_bk, size);
     if (leftover_bk != NULL_HPTR) {
         assert(IS_VALID_BLOCK(leftover_bk));
@@ -384,12 +381,11 @@ void* nalloc(size_t size) {
         assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
         assert(prev_block_if_free(leftover_bk) == NULL_HPTR);
     }
-
+    /* -------------------------------------------------------------------------- */
     dbg_printf("[MALLOC]: Request for %zu bytes sufficed with block %d\n", size, last_bk);
     assert(IS_VALID_BLOCK(last_bk));
     assert(!bk_is_free(last_bk));
     assert(bk_size(last_bk) >= size);
-    print_heap();
     return (char*)mem_heap_lo() + last_bk + sizeof(AllocBlockHeader);
 }
 
