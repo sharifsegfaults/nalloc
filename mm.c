@@ -140,7 +140,7 @@ hptr_t prev_block_if_free(hptr_t block) {
         return NULL_HPTR;
     }
 
-    uint32_t prev_block_size = ((BlockFooter*)((char*)mem_heap_lo() + block - sizeof(BlockFooter)))->size;
+    uint32_t prev_block_size = ((BlockFooter*)(BK_TO_PTR(block) - sizeof(BlockFooter)))->size;
     return block - prev_block_size - sizeof(AllocBlockHeader);
 }
 
@@ -329,7 +329,8 @@ void* nalloc(size_t size) {
         assert(IS_VALID_BLOCK(free_block));
         assert(!bk_is_free(free_block));
         assert(bk_size(free_block) >= size);
-        return (char*)mem_heap_lo() + free_block + sizeof(AllocBlockHeader);
+        assert((uintptr_t)(BK_TO_PTR(free_block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
+        return BK_TO_PTR(free_block) + sizeof(AllocBlockHeader);
     }
 
     // There is no free block to accomodate this request :(
@@ -389,8 +390,9 @@ void* nalloc(size_t size) {
     assert(IS_VALID_BLOCK(last_bk));
     assert(!bk_is_free(last_bk));
     assert(bk_size(last_bk) >= size);
+    assert((uintptr_t)(BK_TO_PTR(last_bk) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
     print_heap();
-    return (char*)mem_heap_lo() + last_bk + sizeof(AllocBlockHeader);
+    return BK_TO_PTR(last_bk) + sizeof(AllocBlockHeader);
 }
 
 void nfree(void* ptr) {
@@ -461,6 +463,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(IS_VALID_BLOCK(block));
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
+        assert((uintptr_t)ptr % ALIGNMENT == 0);
         print_heap();
         return ptr;
     }
@@ -487,8 +490,9 @@ void* nrealloc(void* ptr, size_t size) {
         assert(IS_VALID_BLOCK(block));
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
+        assert((uintptr_t)(BK_TO_PTR(block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
         print_heap();
-        return (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
+        return BK_TO_PTR(block) + sizeof(AllocBlockHeader);
     }
 
     if (pblock != NULL_HPTR && bk_is_free(pblock) &&
@@ -504,8 +508,8 @@ void* nrealloc(void* ptr, size_t size) {
         bk_set_is_free(pblock, false);
 
         // Copy the user's info
-        char* block_uptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
-        char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
+        char* block_uptr = BK_TO_PTR(block) + sizeof(AllocBlockHeader);
+        char* pblock_uptr = BK_TO_PTR(pblock) + sizeof(AllocBlockHeader);
         memmove(pblock_uptr, block_uptr, prev_size);
         memcpy(pblock_uptr + prev_size - sizeof(BlockFooter), &user_info_in_footer, sizeof(BlockFooter));
 
@@ -528,6 +532,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(IS_VALID_BLOCK(pblock));
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
+        assert((uintptr_t)pblock_uptr % ALIGNMENT == 0);
         print_heap();
         return pblock_uptr;
     }
@@ -555,16 +560,17 @@ void* nrealloc(void* ptr, size_t size) {
             assert(prev_block_if_free(leftover_bk) == NULL_HPTR);
         }
 
-        char* block_uptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
-        char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
+        char* block_uptr = BK_TO_PTR(block) + sizeof(AllocBlockHeader);
+        char* pblock_uptr = BK_TO_PTR(pblock) + sizeof(AllocBlockHeader);
         memmove(pblock_uptr, block_uptr, prev_size);
 
         dbg_printf("[REALLOC] Merged %d, %d, and %d -- New size: %d\n", pblock, block, nblock, bk_size(pblock));
         assert(IS_VALID_BLOCK(pblock));
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
+        assert((uintptr_t)(BK_TO_PTR(pblock) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
         print_heap();
-        return (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
+        return BK_TO_PTR(pblock) + sizeof(AllocBlockHeader);
     }
 
     // If nothing worked... We just do the usual
@@ -576,5 +582,6 @@ void* nrealloc(void* ptr, size_t size) {
 
     dbg_printf("[REALLOC] Reallocated %d to %lu\n", block,
                (uintptr_t)new_ptr - (uintptr_t)mem_heap_lo() - sizeof(AllocBlockHeader));
+    assert((uintptr_t)new_ptr % ALIGNMENT == 0);
     return new_ptr;
 }
