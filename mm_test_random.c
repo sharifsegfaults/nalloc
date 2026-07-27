@@ -109,9 +109,9 @@ bool E2E_TEST_1(size_t seed) {
 }
 
 bool E2E_TESTS() {
-    // Solved: 1785106060
-    // Failing: 1785124939
-    size_t seed = 1785124939;
+    // Solved: 1785106060, 1785124939
+    // Failing: 1785126214
+    size_t seed = 1785126214;
     srand(seed);
 
     return (

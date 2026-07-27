@@ -549,6 +549,7 @@ void* nrealloc(void* ptr, size_t size) {
         // ! Order matters -- allows us to avoid footer overwrite of `block`
         coalesce_blocks(block, nblock);
         coalesce_blocks(pblock, block);
+        bk_set_is_free(pblock, false);
 
         hptr_t leftover_bk = partition_if_worth_it(pblock, size);
         if (leftover_bk != NULL_HPTR) {
@@ -562,7 +563,6 @@ void* nrealloc(void* ptr, size_t size) {
         char* block_uptr = (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader);
         char* pblock_uptr = (char*)mem_heap_lo() + pblock + sizeof(AllocBlockHeader);
         memmove(pblock_uptr, block_uptr, prev_size);
-        bk_set_is_free(pblock, false);
 
         dbg_printf("[REALLOC] Merged %d, %d, and %d -- New size: %d\n", pblock, block, nblock, bk_size(pblock));
         assert(IS_VALID_BLOCK(pblock));
