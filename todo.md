@@ -2,7 +2,8 @@
 
 - [X] Add logs to events (i.e., tree rotations, insertions, free's, coalescings, etc.)
 - [X] Add a bunch of asserts -- also to rbtree?
-- [ ] Get rid of magic numbers
+- [X] Get rid of magic numbers
+- [ ] Create crazy tests
 - [ ] Beautify the code :)
 
 ### Postponed

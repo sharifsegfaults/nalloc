@@ -291,6 +291,55 @@ bool TEST_REMOVE() {
     return true;
 }
 
+bool TEST_FROM_HELL() {
+    rbtree_t rbtree = create_rbtree();
+
+    hptr_t p32 = create_block(S(32));
+    hptr_t p104 = create_block(S(104));
+    hptr_t p152 = create_block(S(152));
+    hptr_t p264 = create_block(S(264));
+    hptr_t p24 = create_block(S(24));
+
+    rbtree_insert(rbtree, p32);
+    assert(rbtree_eq_vec(rbtree, (Node[1]){
+        csnode(BLACK, S(32)),
+    }, 1));
+    rbtree_insert(rbtree, p104);
+    assert(rbtree_eq_vec(rbtree, (Node[2]){
+        csnode(BLACK, S(32)),
+        csnode(RED, S(104))
+    }, 2));
+    rbtree_insert(rbtree, p152);
+    assert(rbtree_eq_vec(rbtree, (Node[3]){
+        csnode(BLACK, S(104)),
+        csnode(RED, S(32)),
+        csnode(RED, S(152))
+    }, 3));
+    rbtree_insert(rbtree, p264);
+    assert(rbtree_eq_vec(rbtree, (Node[4]){
+        csnode(BLACK, S(104)),
+        csnode(BLACK, S(32)),
+        csnode(BLACK, S(152)),
+        csnode(RED, S(264))
+    }, 4));
+    rbtree_insert(rbtree, p24);
+    assert(rbtree_eq_vec(rbtree, (Node[5]){
+        csnode(BLACK, S(104)),
+        csnode(BLACK, S(32)),
+        csnode(RED, S(24)),
+        csnode(BLACK, S(152)),
+        csnode(RED, S(264))
+    }, 5));
+
+    rbtree_remove(rbtree, p104);
+    assert(rbtree_eq_vec(rbtree, (Node[4]){
+        csnode(BLACK, S(152)),
+        csnode(BLACK, S(32)),
+        csnode(RED, S(24)),
+        csnode(BLACK, S(264))
+    }, 4));
+    return true;
+}
 
 int main() {
     const int HEAP_SIZE = 1 * 1024 * 1024;
@@ -302,6 +351,8 @@ int main() {
     TEST_INSERTION();
     TEST_FIND();
     TEST_REMOVE();
+
+    TEST_FROM_HELL();
 
     printf("Success B)\n");
 }

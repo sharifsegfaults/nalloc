@@ -1,14 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <time.h>
 #include "mm.h"
 
 static char *heap;
-
-void setUp() {
-    srand(time(NULL));
-}
 
 /* -------------------------------------------------------------------------- */
 /*                                 UNIT TESTS                                 */
@@ -175,10 +170,9 @@ char* randbytes(uint32_t size) {
 }
 
 typedef struct {
-    bool free;
-    uint32_t data_size;
     char* data;
     char* memptr;
+    uint32_t data_size;
 } Block;
 
 Block create_block(uint32_t size) {
@@ -187,14 +181,12 @@ Block create_block(uint32_t size) {
     bk.memptr = nalloc(size);
     memcpy(bk.memptr, bk.data, size);
     bk.data_size = size;
-    bk.free = false;
-
+    
     return bk;
 }
 
 void free_block(Block bk) {
     nfree(bk.memptr);
-    bk.free = true;
 }
 
 Block realloc_block(Block bk, uint32_t size) {
@@ -207,39 +199,32 @@ Block realloc_block(Block bk, uint32_t size) {
     return bk;
 }
 
-/* --------------------------------- RANDOM --------------------------------- */
-uint32_t randint(uint32_t max) {
-    return rand() % (max + 1);
-}
-
 bool E2E_TEST_1() {
-    mm_init();
+    uint32_t sizes[3];
+    char* data[3];
+    char* blocks[3];
 
-    uint32_t numblocks = 0;
-    uint32_t freebks = 0;
-    Block blocks[10];
-    for (int i = 0; i < 10; ++i) {
-        // Pick random operation
-        uint32_t op = randint(2);
-        // Nalloc
-        if (op == 0) {
-            blocks[numblocks] = create_block(randint(256));
-            ++numblocks;
-            continue;
-        }
-        // Pick a random ALLOCATED block -- allocbk
-        
-        // Free
-        if (op == 1) {
-            free_block(*bk);
-            ++freebks;
-        }
-        // Realloc
-        if (op == 2) {
-            *bk = realloc_block(*bk, randint(256));
-        }
+    for (int i = 0; i < 3; ++i) {
+        sizes[i] = 40;
+        data[i] = randbytes(sizes[i]);
+        blocks[i] = nalloc(sizes[i]);
+        memcpy(blocks[i], data[i], sizes[i]);
     }
 
+    //  (b0)  (b1)  (b2)
+    nfree(blocks[0]);
+    //   b0   (b1)  (b2)
+    blocks[1] = nrealloc(blocks[1], sizes[0] + sizes[1]);
+    //   (---b1--)  (b2)
+    assert(!memcmp(blocks[1], data[1], sizes[1]));
+
+    blocks[1] = nrealloc(blocks[1], sizes[0] + sizes[1] + sizes[2]);
+    //       b0     (b2) (-------b1-------)
+    assert(!memcmp(blocks[1], data[1], sizes[1]));
+
+    blocks[2] = nrealloc(blocks[2], sizes[0] + sizes[1] + sizes[2]);
+    //    (-----b2-----) (-------b1-------)
+    assert(!memcmp(blocks[2], data[2], sizes[2]));
     return true;
 }
 
@@ -249,8 +234,8 @@ bool E2E_TESTS() {
     );
 }
 
-int main() {
-    setUp();
+int main()
+{
     heap = malloc(1 * 1024);
     mem_init(heap, 1 * 1024);
 

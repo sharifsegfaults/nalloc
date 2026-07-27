@@ -8,7 +8,7 @@
             "name": "(lldb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bins/mm_test",
+            "program": "${workspaceFolder}/bins/mm_test_random",
             "args": [],
             "stopAtEntry": true,
             "cwd": "${fileDirname}",
