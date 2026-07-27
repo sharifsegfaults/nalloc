@@ -66,10 +66,10 @@ bool E2E_TEST_1(size_t seed) {
 
     uint32_t ops = 0;
     uint32_t numblocks = 0;
-    Block blocks[100];
-    stivec_t allocbks = create_stivec(100);
+    Block blocks[10000];
+    stivec_t allocbks = create_stivec(10000);
 
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 10000; ++i) {
         // Pick random operation
         uint32_t op = randint(2);
         // Nalloc
@@ -109,9 +109,7 @@ bool E2E_TEST_1(size_t seed) {
 }
 
 bool E2E_TESTS() {
-    // Solved: 1785106060, 1785124939
-    // Failing: 1785126214
-    size_t seed = 1785126214;
+    size_t seed = time(NULL);
     srand(seed);
 
     return (
@@ -121,8 +119,9 @@ bool E2E_TESTS() {
 
 int main() {
     setUp();
-    heap = malloc(1 * 4096);
-    mem_init(heap, 1 * 4096);
+    uint32_t heapsize = 1 * 1024 * 1024;
+    heap = malloc(heapsize);
+    mem_init(heap, heapsize);
 
     E2E_TESTS();
     return 0;
