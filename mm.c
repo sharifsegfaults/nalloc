@@ -12,7 +12,6 @@
 rbtree_t rbtree;
 uint32_t padding;
 
-// Have ghost node point to the root of out RB Tree
 /* -------------------------------------------------------------------------- */
 /*                           BLOCK MEMBER VARIABLES                           */
 /* -------------------------------------------------------------------------- */
@@ -98,7 +97,6 @@ void bk_set_color(hptr_t block, Color color) {
 }
 
 // size | prev_free | free
-
 bool bk_is_free(hptr_t block) {
     assert(block != NULL_HPTR);
     hptr_t nblock = next_block(block) == NULL_HPTR ? rbtree.block : next_block(block);
@@ -133,9 +131,8 @@ hptr_t next_block(hptr_t block) {
  * @brief Returns the previous block if the block is free -- otherwise, returns NULL_HPTR
  */
 hptr_t prev_block_if_free(hptr_t block) {
-    // If allocated, user data could've overwritten footer,
-    // thus, we can only do this if the previous block is free
-    // (and thus metadata has been reestablished)
+    // If allocated, user data could've overwritten footer, thus, we can only do this if the
+    // previous block is free (and thus metadata has been reestablished)
     if (block == next_block(rbtree.block) || !bk_prev_free(block)) {
         return NULL_HPTR;
     }
@@ -148,9 +145,14 @@ hptr_t prev_block_if_free(hptr_t block) {
 /*                                 ASSERTIONS                                 */
 /* -------------------------------------------------------------------------- */
 bool IS_VALID_BLOCK(hptr_t block) {
-    return (block != NULL_HPTR && block + sizeof(AllocBlockHeader) + bk_size(block) - 1 < mem_heapsize() &&
-            (bk_is_free(block) ? (bk_size(block) == bk_footer(block)->size) : true) &&
-            bk_size(block) >= MIN_BLOCK_SIZE);
+    return (
+        block != NULL_HPTR
+        // Last byte of block is within the heap
+        && block + sizeof(AllocBlockHeader) + bk_size(block) - 1 < mem_heapsize()
+        // Whenever block is free, footer is present
+        && (bk_is_free(block) ? (bk_size(block) == bk_footer(block)->size) : true)
+        && bk_size(block) >= MIN_BLOCK_SIZE
+    );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -196,65 +198,61 @@ void print_heap() {
  *
  * @remark This function corrupts the rbtree metadata
  */
-hptr_t partition_block(hptr_t block, uint32_t size_needed) {
+static hptr_t partition_block(hptr_t block, uint32_t size_needed) {
     assert(IS_VALID_BLOCK(block));
     assert(size_needed >= MIN_BLOCK_SIZE);
 
     size_needed = ALIGN(sizeof(AllocBlockHeader) + size_needed) - sizeof(AllocBlockHeader);
-
     uint32_t total_space = sizeof(AllocBlockHeader) + bk_size(block);
     uint32_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
     uint32_t total_right_space = total_space - total_left_space;
-    dbg_printf("Partitioning block %d to left size of %d. Remaining free block of size: %lu\n", block, size_needed,
-               total_right_space - sizeof(AllocBlockHeader));
-
-    assert(total_right_space >= sizeof(FreeBlockHeader) + sizeof(BlockFooter));
+    assert(total_right_space >= sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE);
 
     hptr_t right_bk = block + total_left_space;
-
-    // ! Try to store the important state you need in variables because all of the block-moving
-    // ! and block manipulation changes temporarily metadata (like prev_free of some block could
-    // ! temporarily be pointing at the wrong thing)
+    /* -------------------------------------------------------------------------- */
+    // ! Store the important state you need in variables -- metadata will be corrupted temporarily
     bool is_free_block = bk_is_free(block);
 
     bk_set_size(right_bk, total_right_space - sizeof(AllocBlockHeader));
     bk_set_prev_free(right_bk, is_free_block);
     bk_set_is_free(right_bk, true);
+
     // If it's allocated we don't want to override the footer
     if (!is_free_block) {
         BlockFooter user_info_in_new_footer;
-        char* new_footer_ptr =
-            (char*)mem_heap_lo() + block + sizeof(AllocBlockHeader) + size_needed - sizeof(BlockFooter);
+        char* new_footer_ptr = BK_TO_PTR(block) + sizeof(AllocBlockHeader) + size_needed - sizeof(BlockFooter);
         memcpy(&user_info_in_new_footer, new_footer_ptr, sizeof(BlockFooter));
         bk_set_size(block, size_needed);
         memcpy(bk_footer(block), &user_info_in_new_footer, sizeof(BlockFooter));
     } else {
         bk_set_size(block, size_needed);
     }
-
+    /* -------------------------------------------------------------------------- */
     assert(IS_VALID_BLOCK(block));
     assert(bk_size(block) >= size_needed);
     assert(IS_VALID_BLOCK(right_bk));
-
     return right_bk;
 }
 
-hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
+/**
+ * @brief Partitions block only if the leftover block is at least PARTITION_THRESHOLD bytes long
+ * 
+ * @returns leftover block. NULL_HPTR if none.
+ */
+static hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
     assert(IS_VALID_BLOCK(block));
 
+    size_needed = ALIGN(MAX(size_needed, MIN_BLOCK_SIZE));
     uint32_t block_space = sizeof(AllocBlockHeader) + bk_size(block);
-    size_needed = MAX(size_needed, MIN_BLOCK_SIZE);
-    size_needed = ALIGN(sizeof(AllocBlockHeader) + size_needed) - sizeof(AllocBlockHeader);
     uint32_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
-
+    /* -------------------------------------------------------------------------- */
     if (block_space - total_left_space >= PARTITION_THRESHOLD) {
         hptr_t res = partition_block(block, size_needed);
-
         assert(IS_VALID_BLOCK(block));
         assert(IS_VALID_BLOCK(res));
         return res;
     }
-
+    /* -------------------------------------------------------------------------- */
     assert(IS_VALID_BLOCK(block));
     return NULL_HPTR;
 }
@@ -263,6 +261,8 @@ hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
 /**
  * @pre block1 is to the left of block2, both are free blocks, and both have been removed
  * from the rbtree
+ * 
+ * @post Only the header and footer of block1 and block2 will be modified
  */
 void coalesce_blocks(hptr_t block1, hptr_t block2) {
     assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
@@ -270,17 +270,12 @@ void coalesce_blocks(hptr_t block1, hptr_t block2) {
     assert(next_block(block1) == block2);
     uint32_t ogsize1 = bk_size(block1);
     uint32_t ogsize2 = bk_size(block2);
-    /* -------------------------------------------------------------------------- */
     uint32_t new_size = bk_size(block1) + sizeof(AllocBlockHeader) + bk_size(block2);
-
+    /* -------------------------------------------------------------------------- */
     dbg_printf("Coalescing %d with %d -- Size of new block is %d\n", block1, block2, new_size);
 
-    if (next_block(block2) != NULL_HPTR) {
-        bk_set_prev_free(next_block(block2), bk_is_free(block1));
-    } else {
-        bk_set_prev_free(rbtree.block, bk_is_free(block1));
-    }
-
+    hptr_t block_with_my_prev_free = (next_block(block2) != NULL_HPTR) ? next_block(block2) : rbtree.block;
+    bk_set_prev_free(block_with_my_prev_free, bk_is_free(block1));
     bk_set_size(block1, new_size);
     /* -------------------------------------------------------------------------- */
     assert(IS_VALID_BLOCK(block1));

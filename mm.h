@@ -14,9 +14,11 @@ typedef uint32_t hptr_t;
 
 #define ALIGNMENT (alignof(max_align_t))
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT - 1))
+
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20
 #define MIN_BLOCK_SIZE sizeof(FreeBlockHeader) + sizeof(BlockFooter) - sizeof(AllocBlockHeader)
+#define BK_TO_PTR(block) ((char*)mem_heap_lo() + block)
 
 #ifdef DEBUG
 #define dbg_printf printf
@@ -82,9 +84,6 @@ extern void bk_set_is_free(hptr_t block, bool is_free);
 /* ----------------------------- BLOCK NEIGHBOURS ---------------------------- */
 extern hptr_t next_block(hptr_t block);
 extern hptr_t prev_block_if_free(hptr_t block);
-
-/* ---------------------------------- TEMP ---------------------------------- */
-extern hptr_t partition_block(hptr_t block, uint32_t size_needed);
 
 /* -------------------------------------------------------------------------- */
 /*                               MAIN FUNCTIONS                               */
