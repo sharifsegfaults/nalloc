@@ -262,7 +262,7 @@ static hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
  * @pre block1 is to the left of block2, both are free blocks, and both have been removed
  * from the rbtree
  *
- * @post Only the allocated header of block1 and ??? will be modified
+ * @post Only the allocated header of block1 and header and footer of block2 will be modified
  */
 void coalesce_blocks(hptr_t block1, hptr_t block2) {
     assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
