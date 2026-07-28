@@ -1,11 +1,11 @@
 #pragma once
 
+#include <stdalign.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdalign.h>
-#include <stddef.h>
 
 #include "memlib.h"
 
@@ -26,28 +26,21 @@ typedef uint32_t hptr_t;
 #define dbg_printf(...)
 #endif
 
-typedef enum : uint8_t
-{
-    RED = 0,
-    BLACK = 1
-} Color;
+typedef enum : uint8_t { RED = 0, BLACK = 1 } Color;
 
-typedef struct
-{
+typedef struct {
     _Alignas(ALIGNMENT) uint32_t __spfc;
 } AllocBlockHeader;
 
 // Thank you NegVorsa!
-typedef struct
-{
+typedef struct {
     uint32_t __spfc;
     hptr_t left;
     hptr_t right;
     hptr_t parent;
 } FreeBlockHeader;
 
-typedef struct
-{
+typedef struct {
     uint32_t size;
 } BlockFooter;
 
@@ -96,14 +89,14 @@ extern int mm_init(void);
  *
  * @returns Pointer to memory section containing at least `size` modifiable bytes
  */
-extern void *nalloc(size_t size);
+extern void* nalloc(size_t size);
 
 /**
  * @brief Frees a previously allocated memory block.
  *
  * @param ptr  Pointer to block to be freed. Must be a pointer returned by a previous call to nalloc
  */
-extern void nfree(void *ptr);
+extern void nfree(void* ptr);
 
 /**
  * @brief Reallocates the information in memory block pointed to by `ptr` to
@@ -113,7 +106,7 @@ extern void nfree(void *ptr);
  *
  * @returns Pointer to the new memory block
  */
-extern void *nrealloc(void *ptr, size_t size);
+extern void* nrealloc(void* ptr, size_t size);
 
 /* -------------------------------- DEBUGGING ------------------------------- */
 void print_heap();

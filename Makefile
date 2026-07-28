@@ -1,15 +1,18 @@
-FLAGS := -g
+FLAGS := -Ilib -Iinclude -Isrc -g
 
-all: nalloc
+test: mm_test_random rbtree_test
 
-mm_test: memlib.c mm.c rbtree.c mm_test.c
-	gcc $^ -o bins/$@ ${FLAGS}
+mm_test: src/memlib.c src/mm.c src/rbtree.c tests/mm_test.c
+	mkdir -p build/tests
+	gcc $^ -o build/tests/$@ ${FLAGS}
 
-mm_test_random: memlib.c mm.c rbtree.c mm_test_random.c stivec.c
-	gcc $^ -o bins/$@ ${FLAGS}
+mm_test_random: src/memlib.c src/mm.c src/rbtree.c tests/mm_test_random.c src/lib/containers/stivec.c
+	mkdir -p build/tests
+	gcc $^ -o build/tests/$@ ${FLAGS}
 
-rbtree_test: memlib.c mm.c rbtree.c rbtree_test.c
-	gcc $^ -o bins/$@ ${FLAGS}
+rbtree_test: src/memlib.c src/mm.c src/rbtree.c tests/rbtree_test.c
+	mkdir -p build/tests
+	gcc $^ -o build/tests/$@ ${FLAGS}
 
 clean:
-	rm -rf bins/mm_test bins/rbtree_test
+	rm -rf build/*

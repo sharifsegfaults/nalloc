@@ -3,8 +3,8 @@
 #include <assert.h>
 #include <time.h>
 #include "mm.h"
-#include "common.h"
-#include "stivec.h"
+#include "utils.h"
+#include "containers/stivec.h"
 
 static char *heap;
 

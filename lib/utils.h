@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdlib.h>
+
 static inline size_t max_size_n(const size_t *values, size_t count) {
   size_t max = values[0];
   for (size_t i = 1; i < count; ++i)
@@ -21,4 +23,3 @@ static inline size_t min_size_n(const size_t *values, size_t count) {
 #define MIN(...)                                           \
   min_size_n((const size_t[]){__VA_ARGS__},                \
   sizeof((const size_t[]){__VA_ARGS__}) / sizeof(size_t))  \
-

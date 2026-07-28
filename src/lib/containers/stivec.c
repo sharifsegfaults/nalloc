@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <assert.h>
-#include "stivec.h"
+#include "containers/stivec.h"
 
 stivec_t create_stivec(uint32_t max_size) {
     stivec_t stivec;
