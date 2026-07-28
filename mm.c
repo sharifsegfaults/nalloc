@@ -258,12 +258,11 @@ static hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
     return NULL_HPTR;
 }
 
-// ! Parts of the program depend on this thing overwriting only the header and footer of both blocks
 /**
  * @pre block1 is to the left of block2, both are free blocks, and both have been removed
  * from the rbtree
  *
- * @post Only the header and footer of block1 and block2 will be modified
+ * @post Only the allocated header of block1 and ??? will be modified
  */
 void coalesce_blocks(hptr_t block1, hptr_t block2) {
     assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
@@ -364,10 +363,10 @@ void* nalloc(size_t size) {
     }
     dbg_printf("[MALLOC]: Heap expanded by %d\n", expansion_size);
 
+    // If last block is free, expand into new area. If not, make new area a block
     if (is_last_bk_free) {
         bk_set_size(last_bk, bk_size(last_bk) + expansion_size);
     } else {
-        // Convert expanded area into a block (last block, by definition)
         last_bk = mem_heapsize() - expansion_size;
         bk_set_size(last_bk, expansion_size - sizeof(AllocBlockHeader));
         bk_set_prev_free(last_bk, false);
@@ -391,24 +390,21 @@ void* nalloc(size_t size) {
     assert(!bk_is_free(last_bk));
     assert(bk_size(last_bk) >= size);
     assert((uintptr_t)(BK_TO_PTR(last_bk) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-    print_heap();
     return BK_TO_PTR(last_bk) + sizeof(AllocBlockHeader);
 }
 
 void nfree(void* ptr) {
-    // We need to reinstate metadata
     hptr_t block = (uintptr_t)((char*)ptr - sizeof(AllocBlockHeader)) - (uintptr_t)mem_heap_lo();
     dbg_printf("Freeing block %d\n", block);
     assert(IS_VALID_BLOCK(block));
     assert(!bk_is_free(block));
-
+    /* -------------------------------------------------------------------------- */
+    // Reinstate metadata
     bk_set_size(block, bk_size(block));
     bk_set_is_free(block, true);
-    // * No need to set prev_free since it is part of size so it hasn't been overwritten
+    // No need to set prev_free since it is part of size so it hasn't been overwritten
 
     // Coalescing
-    // ! Order matters
-    // ! DO NOT USE prev_block UNLESS YOU KNOW THAT THE PREVIOUS BLOCK IS FREE
     hptr_t nblock = next_block(block);
     hptr_t pblock = prev_block_if_free(block);
 
@@ -430,7 +426,6 @@ void nfree(void* ptr) {
     assert(bk_is_free(block));
     assert(next_block(block) == NULL_HPTR || !bk_is_free(next_block(block)));
     assert(!bk_prev_free(block) || prev_block_if_free(block) == NULL_HPTR);
-    print_heap();
 }
 
 void* nrealloc(void* ptr, size_t size) {
@@ -439,13 +434,13 @@ void* nrealloc(void* ptr, size_t size) {
     hptr_t block = ((uintptr_t)ptr - (uintptr_t)mem_heap_lo()) - sizeof(AllocBlockHeader);
     hptr_t pblock = prev_block_if_free(block);
     hptr_t nblock = next_block(block);
-
     assert(IS_VALID_BLOCK(block));
+
     dbg_printf("Reallocating %d -- looking for size %zu\n", block, size);
 
     uint32_t space_needed = sizeof(AllocBlockHeader) + size;
-
-    /* -------------------------------- SHRINKING ------------------------------- */
+    /* -------------------------------------------------------------------------- */
+    // Shrinking
     if (bk_size(block) >= size) {
         hptr_t leftover_bk = partition_if_worth_it(block, size);
         if (leftover_bk != NULL_HPTR) {
@@ -459,21 +454,20 @@ void* nrealloc(void* ptr, size_t size) {
             assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
             assert(prev_block_if_free(leftover_bk) == NULL_HPTR);
         }
+        /* -------------------------------------------------------------------------- */
         dbg_printf("[REALLOC] Shrinked %d to %d\n", block, bk_size(block));
         assert(IS_VALID_BLOCK(block));
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
         assert((uintptr_t)ptr % ALIGNMENT == 0);
-        print_heap();
         return ptr;
     }
 
-    /* -------------------------------- EXPANDING ------------------------------- */
+    // If merging with right is enough...
     if (nblock != NULL_HPTR && bk_is_free(nblock) &&
         bk_size(block) + sizeof(AllocBlockHeader) + bk_size(nblock) >= size) {
         assert(IS_VALID_BLOCK(nblock));
         /* -------------------------------------------------------------------------- */
-        // Merge the two together
         rbtree_remove(rbtree, nblock);
         coalesce_blocks(block, nblock);
         // Partition if necessary
@@ -485,22 +479,23 @@ void* nrealloc(void* ptr, size_t size) {
             assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
             assert(prev_block_if_free(leftover_bk) == NULL_HPTR);
         }
-
+        /* -------------------------------------------------------------------------- */
         dbg_printf("[REALLOC] Just expanded block. New size: %d\n", bk_size(block));
         assert(IS_VALID_BLOCK(block));
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
         assert((uintptr_t)(BK_TO_PTR(block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-        print_heap();
         return BK_TO_PTR(block) + sizeof(AllocBlockHeader);
     }
 
+    // If merging with left is enough...
     if (pblock != NULL_HPTR && bk_is_free(pblock) &&
         bk_size(pblock) + sizeof(AllocBlockHeader) + bk_size(block) >= size) {
         assert(IS_VALID_BLOCK(pblock));
         /* -------------------------------------------------------------------------- */
         uint32_t prev_size = bk_size(block);
-        // Merge the two together
+
+        // Merge the two together -- coalescing may overwrite footer bytes, so store them
         rbtree_remove(rbtree, pblock);
         BlockFooter user_info_in_footer;
         memcpy(&user_info_in_footer, bk_footer(block), sizeof(BlockFooter));
@@ -527,16 +522,17 @@ void* nrealloc(void* ptr, size_t size) {
             assert(next_block(leftover_bk) == NULL_HPTR || !bk_is_free(next_block(leftover_bk)));
             assert(prev_block_if_free(leftover_bk) == NULL_HPTR);
         }
-
+        /* -------------------------------------------------------------------------- */
         dbg_printf("[REALLOC] Merged %d with %d and reallocated -- New size is: %d\n", block, pblock, bk_size(pblock));
         assert(IS_VALID_BLOCK(pblock));
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
         assert((uintptr_t)pblock_uptr % ALIGNMENT == 0);
-        print_heap();
         return pblock_uptr;
     }
 
+    // If merging with both our left and our right is enough...
+    // PS: This is cheaper -- we'd already know we can fit here (thus we save an rbtree search)
     if (pblock != NULL_HPTR && nblock != NULL_HPTR && bk_is_free(pblock) && bk_is_free(nblock) &&
         bk_size(pblock) + 2 * sizeof(AllocBlockHeader) + bk_size(block) + bk_size(nblock) >= size) {
         assert(IS_VALID_BLOCK(pblock));
@@ -563,13 +559,12 @@ void* nrealloc(void* ptr, size_t size) {
         char* block_uptr = BK_TO_PTR(block) + sizeof(AllocBlockHeader);
         char* pblock_uptr = BK_TO_PTR(pblock) + sizeof(AllocBlockHeader);
         memmove(pblock_uptr, block_uptr, prev_size);
-
+        /* -------------------------------------------------------------------------- */
         dbg_printf("[REALLOC] Merged %d, %d, and %d -- New size: %d\n", pblock, block, nblock, bk_size(pblock));
         assert(IS_VALID_BLOCK(pblock));
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
         assert((uintptr_t)(BK_TO_PTR(pblock) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-        print_heap();
         return BK_TO_PTR(pblock) + sizeof(AllocBlockHeader);
     }
 
@@ -579,7 +574,7 @@ void* nrealloc(void* ptr, size_t size) {
         memcpy(new_ptr, ptr, bk_size(block));
         nfree(ptr);
     }
-
+    /* -------------------------------------------------------------------------- */
     dbg_printf("[REALLOC] Reallocated %d to %lu\n", block,
                (uintptr_t)new_ptr - (uintptr_t)mem_heap_lo() - sizeof(AllocBlockHeader));
     assert((uintptr_t)new_ptr % ALIGNMENT == 0);
