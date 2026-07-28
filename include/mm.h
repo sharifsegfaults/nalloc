@@ -9,6 +9,7 @@
 
 #include "memlib.h"
 
+
 typedef uint32_t hptr_t;
 #define NULL_HPTR UINT32_MAX
 
@@ -25,8 +26,6 @@ typedef uint32_t hptr_t;
 #else
 #define dbg_printf(...)
 #endif
-
-typedef enum : uint8_t { RED = 0, BLACK = 1 } Color;
 
 typedef struct {
     _Alignas(ALIGNMENT) uint32_t __spfc;
