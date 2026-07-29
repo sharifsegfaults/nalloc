@@ -2,7 +2,7 @@
 
 #define MAX_HEAP (20 << 20)
 
-void mem_init(char* heap, uint32_t og_size);               
+void mem_init(char* heap, size_t og_size);               
 void mem_deinit(void);
 void *mem_sbrk(int incr);
 void mem_reset_brk(void); 

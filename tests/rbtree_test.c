@@ -12,7 +12,7 @@ typedef struct {
     node_t rbtree_node;
 } Data;
 
-static node_t* rbtree_find(rbtree_t* rbtree, uint32_t size) {
+static node_t* rbtree_find(rbtree_t* rbtree, size_t size) {
     node_t* curr_nd = rbtree->root;
     node_t* ub = NULL;
 

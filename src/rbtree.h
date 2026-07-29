@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 typedef enum : uint8_t { RED = 0, BLACK = 1 } Color;
 
@@ -97,4 +98,4 @@ char check_if_triangle(node_t* node);
 char check_if_line(node_t* node);
 
 /* -------------------------------- DEBUGGING ------------------------------- */
-extern uint32_t rbtree_to_vec(node_t* rbtree, node_t* result[]);
+extern size_t rbtree_to_vec(node_t* rbtree, node_t* result[]);

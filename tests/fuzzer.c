@@ -13,12 +13,12 @@ static char *heap;
 /* -------------------------------------------------------------------------- */
 /*                                    UTILS                                   */
 /* -------------------------------------------------------------------------- */
-uint32_t curr_seed = 1;
+size_t curr_seed = 1;
 
-uint32_t randint(uint32_t max) {
+size_t randint(size_t max) {
     return rand() % (max + 1);
 }
-char* randbytes(uint32_t size) {
+char* randbytes(size_t size) {
     char* bytes = malloc(size);
     for (int i = 0; i < size; ++i) {
         bytes[i] = curr_seed;
@@ -29,7 +29,7 @@ char* randbytes(uint32_t size) {
 
 typedef struct {
     bool free;
-    uint32_t data_size;
+    size_t data_size;
     char* data;
     char* memptr;
 } Block;
@@ -37,7 +37,7 @@ typedef struct {
 /* -------------------------------------------------------------------------- */
 /*                             OPERATION TRACKERS                             */
 /* -------------------------------------------------------------------------- */
-Block create_block(uint32_t size) {
+Block create_block(size_t size) {
     Block bk;
     bk.data = randbytes(size);
     bk.memptr = nalloc(size);
@@ -53,7 +53,7 @@ void free_block(Block bk) {
     bk.free = true;
 }
 
-Block realloc_block(Block bk, uint32_t size) {
+Block realloc_block(Block bk, size_t size) {
     assert(!memcmp(bk.memptr, bk.data, bk.data_size));
     bk.memptr = nrealloc(bk.memptr, size);
     // Check data is not lost
@@ -69,21 +69,21 @@ Block realloc_block(Block bk, uint32_t size) {
 /* -------------------------------------------------------------------------- */
 /*                                   FUZZER                                   */
 /* -------------------------------------------------------------------------- */
-bool fuzzer(size_t seed, uint32_t num_ops) {
+bool fuzzer(size_t seed, size_t num_ops) {
     mm_init();
 
-    uint32_t ops = 0;
-    uint32_t numblocks = 0;
+    size_t ops = 0;
+    size_t numblocks = 0;
     Block blocks[num_ops];
     stivec_t allocbks = create_stivec(num_ops);
 
     for (int i = 0; i < num_ops; ++i) {
         // Pick random operation
-        uint32_t op = randint(2);
+        size_t op = randint(2);
         // Nalloc
         if (op == 0) {
-            uint32_t size = randint(256);
-            printf("[%d] MALLOC(%d)\n", ops, size);
+            size_t size = randint(256);
+            printf("[%zu] MALLOC(%zu)\n", ops, size);
             ++ops;
             blocks[numblocks] = create_block(size);
             stivec_insert(&allocbks, numblocks);
@@ -95,19 +95,19 @@ bool fuzzer(size_t seed, uint32_t num_ops) {
             --i;
             continue;
         }
-        uint32_t bkpos = stivec_random_pop(&allocbks);
+        size_t bkpos = stivec_random_pop(&allocbks);
         Block* bk = &blocks[bkpos];
         // Free
         if (op == 1) {
-            printf("[%d] FREE(%zu)\n", ops, (uint32_t)(bk->memptr - (char*)mem_heap_lo()) - sizeof(AllocBlockHeader));
+            printf("[%zu] FREE(%zu)\n", ops, (size_t)(bk->memptr - (char*)mem_heap_lo()) - sizeof(AllocBlockHeader));
             ++ops;
             free_block(*bk);
         }
         // Realloc
         if (op == 2) {
             stivec_insert(&allocbks, bkpos);
-            uint32_t size = randint(256);
-            printf("[%d] REALLOC(%zu, %d)\n", ops, (uint32_t)(bk->memptr - (char*)mem_heap_lo()) - sizeof(AllocBlockHeader), size);
+            size_t size = randint(256);
+            printf("[%zu] REALLOC(%zu, %zu)\n", ops, (size_t)(bk->memptr - (char*)mem_heap_lo()) - sizeof(AllocBlockHeader), size);
             ++ops;
             *bk = realloc_block(*bk, size);
         }

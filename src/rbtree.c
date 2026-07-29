@@ -428,11 +428,11 @@ char check_if_line(node_t* node) {
 }
 
 /* -------------------------------- DEBUGGING ------------------------------- */
-uint32_t rbtree_to_vec(node_t* node, node_t* result[]) {
+size_t rbtree_to_vec(node_t* node, node_t* result[]) {
     if (node == NULL) return 0;
     result[0] = node;
 
-    uint32_t l_elems = rbtree_to_vec(nd_left(node), result + 1);
-    uint32_t r_elems = rbtree_to_vec(nd_right(node), result + 1 + l_elems);
+    size_t l_elems = rbtree_to_vec(nd_left(node), result + 1);
+    size_t r_elems = rbtree_to_vec(nd_right(node), result + 1 + l_elems);
     return 1 + l_elems + r_elems;
 }

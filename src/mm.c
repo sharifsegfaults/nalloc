@@ -10,7 +10,7 @@
 /*                              STATIC VARIABLES                              */
 /* -------------------------------------------------------------------------- */
 rbtree_t rbtree;
-uint32_t padding;
+size_t padding;
 
 /* -------------------------------------------------------------------------- */
 /*                           BLOCK MEMBER VARIABLES                           */
@@ -29,12 +29,12 @@ BlockFooter* bk_footer(bptr_t block) {
     // clang-format on
 }
 
-uint32_t bk_size(bptr_t block) {
+size_t bk_size(bptr_t block) {
     assert(block != NULL);
     return bk_free_header(block)->__size_prevfree & ~0b11;
 }
 
-void bk_set_size(bptr_t block, uint32_t size) {
+void bk_set_size(bptr_t block, size_t size) {
     assert(block != NULL);
     assert(size >= MIN_BLOCK_SIZE);
     bk_free_header(block)->__size_prevfree &= 0b11;
@@ -100,7 +100,7 @@ bptr_t prev_block_if_free(bptr_t block) {
         return NULL;
     }
 
-    uint32_t prev_block_size = ((BlockFooter*)((char*)block - sizeof(BlockFooter)))->size;
+    size_t prev_block_size = ((BlockFooter*)((char*)block - sizeof(BlockFooter)))->size;
     return (bptr_t)((char*)block - prev_block_size - sizeof(AllocBlockHeader));
 }
 
@@ -128,9 +128,9 @@ void print_heap() {
     bptr_t curr_block = mem_heap_lo() + padding;
     while (curr_block != NULL) {
         if (bk_is_free(curr_block)) {
-            printf("|%d\t|", bk_size(curr_block));
+            printf("|%zu\t|", bk_size(curr_block));
         } else {
-            printf("|(%d)\t|", bk_size(curr_block));
+            printf("|(%zu)\t|", bk_size(curr_block));
         }
         curr_block = next_block(curr_block);
     }
@@ -154,14 +154,14 @@ void print_heap() {
  *
  * @remark This function corrupts the rbtree metadata
  */
-static bptr_t partition_block(bptr_t block, uint32_t size_needed) {
+static bptr_t partition_block(bptr_t block, size_t size_needed) {
     assert(IS_VALID_BLOCK(block));
     assert(size_needed >= MIN_BLOCK_SIZE);
 
     size_needed = ALIGN(sizeof(AllocBlockHeader) + size_needed) - sizeof(AllocBlockHeader);
-    uint32_t total_space = sizeof(AllocBlockHeader) + bk_size(block);
-    uint32_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
-    uint32_t total_right_space = total_space - total_left_space;
+    size_t total_space = sizeof(AllocBlockHeader) + bk_size(block);
+    size_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
+    size_t total_right_space = total_space - total_left_space;
     assert(total_right_space >= sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE);
 
     bptr_t right_bk = (bptr_t)((char*)block + total_left_space);
@@ -195,12 +195,12 @@ static bptr_t partition_block(bptr_t block, uint32_t size_needed) {
  *
  * @returns leftover block. NULL if none.
  */
-static bptr_t partition_if_worth_it(bptr_t block, uint32_t size_needed) {
+static bptr_t partition_if_worth_it(bptr_t block, size_t size_needed) {
     assert(IS_VALID_BLOCK(block));
 
     size_needed = ALIGN(MAX(size_needed, MIN_BLOCK_SIZE));
-    uint32_t block_space = sizeof(AllocBlockHeader) + bk_size(block);
-    uint32_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
+    size_t block_space = sizeof(AllocBlockHeader) + bk_size(block);
+    size_t total_left_space = sizeof(AllocBlockHeader) + size_needed;
     /* -------------------------------------------------------------------------- */
     if (block_space - total_left_space >= PARTITION_THRESHOLD) {
         bptr_t res = partition_block(block, size_needed);
@@ -223,9 +223,9 @@ void coalesce_blocks(bptr_t block1, bptr_t block2) {
     assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
     assert(bk_is_free(block1) || bk_is_free(block2));
     assert(next_block(block1) == block2);
-    uint32_t ogsize1 = bk_size(block1);
-    uint32_t ogsize2 = bk_size(block2);
-    uint32_t new_size = bk_size(block1) + sizeof(AllocBlockHeader) + bk_size(block2);
+    size_t ogsize1 = bk_size(block1);
+    size_t ogsize2 = bk_size(block2);
+    size_t new_size = bk_size(block1) + sizeof(AllocBlockHeader) + bk_size(block2);
     /* -------------------------------------------------------------------------- */
     dbg_printf("Coalescing %d with %d -- Size of new block is %d\n", block1, block2, new_size);
 
@@ -240,7 +240,7 @@ void coalesce_blocks(bptr_t block1, bptr_t block2) {
 /* -------------------------------------------------------------------------- */
 /*                               RED-BLACK TREE                               */
 /* -------------------------------------------------------------------------- */
-static node_t* rbtree_find(rbtree_t* rbtree, uint32_t size) {
+static node_t* rbtree_find(rbtree_t* rbtree, size_t size) {
     node_t* curr_nd = rbtree->root;
     node_t* ub = NULL;
 
@@ -340,10 +340,10 @@ void* nalloc(size_t size) {
     // There is no free block to accomodate this request :(
     bool is_last_bk_free = bk_prev_free(mem_heap_lo() + padding);
     bptr_t last_bk = NULL;
-    uint32_t recyclable_space = 0;
+    size_t recyclable_space = 0;
 
     if (is_last_bk_free) {
-        uint32_t last_bk_size = ((BlockFooter*)((char*)mem_heap_hi() - sizeof(BlockFooter) + 1))->size;
+        size_t last_bk_size = ((BlockFooter*)((char*)mem_heap_hi() - sizeof(BlockFooter) + 1))->size;
         last_bk = mem_heap_hi() - last_bk_size - sizeof(AllocBlockHeader) + 1;
         assert(IS_VALID_BLOCK(last_bk));
         assert(next_block(last_bk) == NULL);
@@ -353,9 +353,9 @@ void* nalloc(size_t size) {
     }
 
     // clang-format off
-    uint32_t expansion_size = ALIGN(
+    size_t expansion_size = ALIGN(
         MAX(
-            (uint32_t)(EXPANSION_FACTOR * mem_heapsize()),
+            (size_t)(EXPANSION_FACTOR * mem_heapsize()),
             sizeof(AllocBlockHeader) + size - recyclable_space,
             sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE
         )
@@ -445,7 +445,7 @@ void* nrealloc(void* ptr, size_t size) {
 
     dbg_printf("Reallocating %d -- looking for size %zu\n", block, size);
 
-    uint32_t space_needed = sizeof(AllocBlockHeader) + size;
+    size_t space_needed = sizeof(AllocBlockHeader) + size;
     /* -------------------------------------------------------------------------- */
     // Shrinking
     if (bk_size(block) >= size) {
@@ -500,7 +500,7 @@ void* nrealloc(void* ptr, size_t size) {
     if (pblock != NULL && bk_is_free(pblock) && bk_size(pblock) + sizeof(AllocBlockHeader) + bk_size(block) >= size) {
         assert(IS_VALID_BLOCK(pblock));
         /* -------------------------------------------------------------------------- */
-        uint32_t prev_size = bk_size(block);
+        size_t prev_size = bk_size(block);
 
         // Merge the two together -- coalescing may overwrite footer bytes, so store them
         rbtree_remove(&rbtree, &pblock->rbtree_node);
@@ -546,7 +546,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(IS_VALID_BLOCK(pblock));
         assert(IS_VALID_BLOCK(nblock));
         /* -------------------------------------------------------------------------- */
-        uint32_t prev_size = bk_size(block);
+        size_t prev_size = bk_size(block);
 
         rbtree_remove(&rbtree, &pblock->rbtree_node);
         rbtree_remove(&rbtree, &nblock->rbtree_node);

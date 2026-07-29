@@ -25,17 +25,17 @@
 #endif
 
 typedef struct {
-    _Alignas(ALIGNMENT) uint32_t __spfc;
+    _Alignas(ALIGNMENT) size_t __spfc;
 } AllocBlockHeader;
 
 // Thank you NegVorsa!
 typedef struct {
-    uint32_t __size_prevfree;
+    size_t __size_prevfree;
     node_t rbtree_node;
 } FreeBlockHeader;
 
 typedef struct {
-    uint32_t size;
+    size_t size;
 } BlockFooter;
 
 typedef FreeBlockHeader* bptr_t;
@@ -49,8 +49,8 @@ typedef FreeBlockHeader* bptr_t;
  *
  * @remark Obtains size from block's header (not footer)
  */
-extern uint32_t bk_size(bptr_t block);
-extern void bk_set_size(bptr_t block, uint32_t size);
+extern size_t bk_size(bptr_t block);
+extern void bk_set_size(bptr_t block, size_t size);
 
 extern bool bk_prev_free(bptr_t block);
 extern void bk_set_prev_free(bptr_t block, bool prev_free);
