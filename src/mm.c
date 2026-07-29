@@ -113,7 +113,7 @@ bool IS_VALID_BLOCK(bptr_t block) {
         block != NULL
         && (uintptr_t)block >= (uintptr_t)mem_heap_lo()
         // Last byte of block is within the heap
-        && ((uintptr_t)block + sizeof(AllocBlockHeader) + bk_size(block) - 1) <= (uintptr_t)mem_heap_lo()
+        && ((uintptr_t)block + sizeof(AllocBlockHeader) + bk_size(block) - 1) <= (uintptr_t)mem_heap_hi()
         // Whenever block is free, footer is present
         && (bk_is_free(block) ? (bk_size(block) == bk_footer(block)->size) : true)
         && bk_size(block) >= MIN_BLOCK_SIZE
@@ -126,8 +126,6 @@ bool IS_VALID_BLOCK(bptr_t block) {
 /* -------------------------------------------------------------------------- */
 void print_heap() {
     bptr_t curr_block = mem_heap_lo() + padding;
-    // Skip ghost node
-    curr_block = next_block(curr_block);
     while (curr_block != NULL) {
         if (bk_is_free(curr_block)) {
             printf("|%d\t|", bk_size(curr_block));
@@ -136,9 +134,8 @@ void print_heap() {
         }
         curr_block = next_block(curr_block);
     }
-    printf("\n");
+    printf("-->\n");
     curr_block = mem_heap_lo() + padding;
-    curr_block = next_block(curr_block);
     while (curr_block != NULL) {
         printf("%zu\t", (uintptr_t)curr_block - (uintptr_t)mem_heap_lo());
         curr_block = next_block(curr_block);
@@ -299,7 +296,7 @@ void* nalloc(size_t size) {
     // Lazy initialization
     if (rbtree.root == NULL) {
         padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
-        void* res = mem_sbrk(padding + sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE);
+        void* res = mem_sbrk(padding);
         if (res == (void*)-1) {
             return NULL;
         }
@@ -331,6 +328,7 @@ void* nalloc(size_t size) {
         assert(!bk_is_free(free_block));
         assert(bk_size(free_block) >= size);
         assert((uintptr_t)((char*)(free_block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
+        print_heap();
         return (char*)free_block + sizeof(AllocBlockHeader);
     }
 
@@ -392,6 +390,7 @@ void* nalloc(size_t size) {
     assert(!bk_is_free(last_bk));
     assert(bk_size(last_bk) >= size);
     assert((uintptr_t)((char*)(last_bk) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
+    print_heap();
     return (char*)(last_bk) + sizeof(AllocBlockHeader);
 }
 
@@ -428,6 +427,7 @@ void nfree(void* ptr) {
     assert(bk_is_free(block));
     assert(next_block(block) == NULL || !bk_is_free(next_block(block)));
     assert(!bk_prev_free(block) || prev_block_if_free(block) == NULL);
+    print_heap();
 }
 
 void* nrealloc(void* ptr, size_t size) {
@@ -462,6 +462,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
         assert((uintptr_t)ptr % ALIGNMENT == 0);
+        print_heap();
         return ptr;
     }
 
@@ -486,6 +487,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
         assert((uintptr_t)((char*)(block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
+        print_heap();
         return (char*)(block) + sizeof(AllocBlockHeader);
     }
 
@@ -528,6 +530,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
         assert((uintptr_t)pblock_uptr % ALIGNMENT == 0);
+        print_heap();
         return pblock_uptr;
     }
 
@@ -565,6 +568,7 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
         assert((uintptr_t)((char*)(pblock) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
+        print_heap();
         return (char*)(pblock) + sizeof(AllocBlockHeader);
     }
 

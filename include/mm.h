@@ -15,8 +15,8 @@
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT - 1))
 
 #define EXPANSION_FACTOR 0.35
-#define PARTITION_THRESHOLD 20
 #define MIN_BLOCK_SIZE (ALIGN(sizeof(FreeBlockHeader) + sizeof(BlockFooter) - sizeof(AllocBlockHeader)))
+#define PARTITION_THRESHOLD (sizeof(AllocBlockHeader) + MIN_BLOCK_SIZE)
 
 #ifdef DEBUG
 #define dbg_printf printf
