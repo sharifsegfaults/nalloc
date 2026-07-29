@@ -340,6 +340,7 @@ node_t* left_rotate(rbtree_t* rbtree, node_t* node) {
 
     if (rbtree->root == node) {
         rbtree->root = nd_parent(node);
+        nd_set_parent(rbtree->root, NULL); // ! Shouldn't be necessary with ghost node
     }
     return nd_parent(node);
 }
@@ -361,6 +362,7 @@ node_t* right_rotate(rbtree_t* rbtree, node_t* node) {
 
     if (rbtree->root == node) {
         rbtree->root = nd_parent(node);
+        nd_set_parent(rbtree->root, NULL); // ! Shouldn't be necessary with ghost node
     }
     return nd_parent(node);
 }

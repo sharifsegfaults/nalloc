@@ -134,7 +134,7 @@ void print_heap() {
         }
         curr_block = next_block(curr_block);
     }
-    printf("-->\n");
+    printf("\n");
     curr_block = mem_heap_lo() + padding;
     while (curr_block != NULL) {
         printf("%zu\t", (uintptr_t)curr_block - (uintptr_t)mem_heap_lo());
@@ -259,6 +259,11 @@ static node_t* rbtree_find(rbtree_t* rbtree, uint32_t size) {
 
 static void rbtree_insert(rbtree_t* rbtree, node_t* node) {
     bptr_t bk = container_of(node, FreeBlockHeader, rbtree_node);
+
+    // Starting metadata
+    nd_set_parent(node, NULL);
+    nd_set_left(node, NULL);
+    nd_set_right(node, NULL);
 
     if (rbtree->root == NULL) {
         rbtree->root = node;
