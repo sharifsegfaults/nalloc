@@ -131,9 +131,12 @@ typedef struct {
 
 void help(char* command) {
     printf(
-        "Usage: %s [--(s)eed <seed number>]\n"
-        "[--(m)axheap <max heap size>]\n"
-        "[--(n)umops <number of operations>]"
+        "\n"
+        "Usage: %s\n"
+        "       [--(s)eed <seed number>]\n"
+        "       [--(m)axheap <max heap size>]\n"
+        "       [--(n)umops <number of operations>]\n"
+        "\n"
     , command);
 }
 
@@ -162,7 +165,8 @@ void get_options(int argc, char** argv, Options* options) {
             if (optarg == NULL && optind < argc && argv[optind][0] != '-') {
                 optarg = argv[optind++];
             }
-            size_t arg = (size_t)optarg;
+            char* endptr;
+            size_t arg = strtoull(optarg, &endptr, 10);
             options->seed = arg;
             break;
         }
@@ -171,7 +175,8 @@ void get_options(int argc, char** argv, Options* options) {
             if (optarg == NULL && optind < argc && argv[optind][0] != '-') {
                 optarg = argv[optind++];
             }
-            size_t arg = (size_t)optarg;
+            char* endptr;
+            size_t arg = strtoull(optarg, &endptr, 10);
             options->max_heap_size = arg;
             break;
         }
@@ -197,9 +202,9 @@ void get_options(int argc, char** argv, Options* options) {
 void print_options(Options* options) {
     printf(
         "==[ NFUZZER ]====================\n"
-        "Seed: %zu\n"
-        "Max heap size: %zu\n"
-        "Number of operations: %zu\n"
+        " Seed: %zu\n"
+        " Max heap size: %zu\n"
+        " Number of operations: %zu\n"
         "=================================\n"
     , options->seed, options->max_heap_size, options->numops);
 }
