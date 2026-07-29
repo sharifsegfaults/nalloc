@@ -436,32 +436,3 @@ uint32_t rbtree_to_vec(node_t* node, node_t* result[]) {
     uint32_t r_elems = rbtree_to_vec(nd_right(node), result + 1 + l_elems);
     return 1 + l_elems + r_elems;
 }
-/*
-Node snode(uint32_t size) {
-    Node nody = { RED, NULL, NULL, NULL, size };
-    return nody;
-}
-
-Node csnode(Color color, uint32_t size) {
-    Node nody = { color, NULL, NULL, NULL, size };
-    return nody;
-}
-
-Node node(Color color, uint32_t size, node_t* left, node_t* right, node_t* parent) {
-    Node nody = { color, left, right, parent, size };
-    return nody;
-}
-
-uint32_t rbtree_to_vec(node_t* node, Node* result) {
-    if (node == NULL) return 0;
-    result->color = nd_color(node);
-    result->left = nd_left(node);
-    result->right = nd_right(node);
-    result->parent = nd_parent(node);
-    result->size = bk_size(node);
-
-    uint32_t l_elems = rbtree_to_vec(nd_left(node), result + 1);
-    uint32_t r_elems = rbtree_to_vec(nd_right(node), result + 1 + l_elems);
-    return 1 + l_elems + r_elems;
-}
-*/
