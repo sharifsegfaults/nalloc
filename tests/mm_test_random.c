@@ -70,10 +70,10 @@ bool E2E_TEST_1(size_t seed) {
 
     uint32_t ops = 0;
     uint32_t numblocks = 0;
-    Block blocks[10];
-    stivec_t allocbks = create_stivec(10);
+    Block blocks[10000];
+    stivec_t allocbks = create_stivec(10000);
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10000; ++i) {
         // Pick random operation
         uint32_t op = randint(2);
         // Nalloc
@@ -113,7 +113,7 @@ bool E2E_TEST_1(size_t seed) {
 }
 
 bool E2E_TESTS() {
-    size_t seed = 1785351133;
+    size_t seed = time(NULL);
     srand(seed);
 
     return (
