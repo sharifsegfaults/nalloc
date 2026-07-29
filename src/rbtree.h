@@ -1,12 +1,9 @@
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
-typedef enum : uint8_t {
-    RED = 0,
-    BLACK = 1
-} Color;
+typedef enum : uint8_t { RED = 0, BLACK = 1 } Color;
 
 typedef struct node_t {
     struct node_t* left;
@@ -36,10 +33,12 @@ extern void nd_set_color(node_t* node, Color color);
 /* -------------------------------------------------------------------------- */
 /*                               RBTREE METHODS                               */
 /* -------------------------------------------------------------------------- */
+rbtree_t create_rbtree();
+
 /**
- * @param node This node already exists
+ * @pre Assumes `node` is linked to the correct place if this were a binary search tree
  */
-void rbtree_insert(rbtree_t* rbtree, node_t* node);
+void rbtree_insert_fix(rbtree_t* rbtree, node_t* node);
 
 /**
  * @brief Removes the node pointed to by `node` *using successor replacement*
@@ -53,12 +52,12 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node);
  * Links `to_be_child` as a left/right child (according to `left`) of `to_be_parent`
  * @remark Nullifies the `parent` pointer of the left/right child (according to `left`) of `to_be_parent`
  */
-void tlink(node_t* to_be_parent, node_t* to_be_child, bool left);
+void rbtree_link(node_t* to_be_parent, node_t* to_be_child, bool left);
 
 /**
  * @brief Swaps two nodes
  */
-void swap(node_t* a, node_t* b);
+void swap(rbtree_t* rbtree, node_t* a, node_t* b);
 
 /**
  * @brief Left rotates the tree starting at node
@@ -98,4 +97,4 @@ char check_if_triangle(node_t* node);
 char check_if_line(node_t* node);
 
 /* -------------------------------- DEBUGGING ------------------------------- */
-extern uint32_t rbtree_to_vec(rbtree_t* rbtree, node_t result[]);
+extern uint32_t rbtree_to_vec(node_t* rbtree, node_t* result[]);

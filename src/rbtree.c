@@ -7,35 +7,42 @@
 /*                            NODE MEMBER VARIABLES                           */
 /* -------------------------------------------------------------------------- */
 node_t* nd_left(node_t* node) {
+    assert(node != NULL);
     return node->left;
 }
 
 void nd_set_left(node_t* node, node_t* left) {
+    assert(node != NULL);
     node->left = left;
 }
 
 node_t* nd_right(node_t* node) {
+    assert(node != NULL);
     return node->right;
 }
 
 void nd_set_right(node_t* node, node_t* right) {
+    assert(node != NULL);
     node->right = right;
 }
 
 node_t* nd_parent(node_t* node) {
+    assert(node != NULL);
     return (node_t*)((uintptr_t)(node->__pc) & ~0b1UL);
 }
 
 void nd_set_parent(node_t* node, node_t* parent) {
+    assert(node != NULL);
     node->__pc = (node_t*)((uintptr_t)(node->__pc) & 0b1);
     node->__pc = (node_t*)((uintptr_t)(node->__pc) | (uintptr_t)parent);
 }
 
 Color nd_color(node_t* node) {
-    return (uintptr_t)node->__pc & 0b1;
+    return (node != NULL) ? (uintptr_t)node->__pc & 0b1 : BLACK;
 }
 
 void nd_set_color(node_t* node, Color color) {
+    assert(node != NULL);
     node->__pc = (node_t*)((uintptr_t)node->__pc & ~0b1);
     node->__pc = (node_t*)((uintptr_t)node->__pc | color);
 }
@@ -43,33 +50,25 @@ void nd_set_color(node_t* node, Color color) {
 /* -------------------------------------------------------------------------- */
 /*                               RBTREE METHODS                               */
 /* -------------------------------------------------------------------------- */
+rbtree_t create_rbtree() {
+    return (rbtree_t){ NULL };
+}
+
 /**
- * @pre Assumes `node` is linked to the correct place if this were a binary search tree
+ * @pre Assumes `node` is linked to the correct place as if this were a binary search tree
  */
-void rbtree_insert(rbtree_t* rbtree, node_t* node) {
+void rbtree_insert_fix(rbtree_t* rbtree, node_t* node) {
     // Navigate down the tree until you find the insertion spot
-    // TODO: Offload to user
-    // ! User handles case where tree is empty
-    /*
-    while (true) {
-        if (bk_size(node) < bk_size(curr)) {
-            if (nd_left(curr) == NULL) {
-                tlink(curr, node, true);
-                break;
-            }
-            curr = nd_left(curr);
-        } else {
-            if (nd_right(curr) == NULL) {
-                tlink(curr, node, false);
-                break;
-            }
-            curr = nd_right(curr);
-        }
-    }
-    */
     // Starting metadata
+    nd_set_left(node, NULL);
+    nd_set_right(node, NULL);
     nd_set_color(node, RED);
     node_t* curr = nd_parent(node);
+
+    if (rbtree->root == node) {
+        nd_set_color(node, BLACK);
+        return;
+    }
 
     if (nd_color(curr) == BLACK) {
         return;
@@ -107,8 +106,10 @@ void rbtree_insert(rbtree_t* rbtree, node_t* node) {
         // Case 2: uncle is black, and node forms a triangle with its grandpa
         char tridir = check_if_triangle(node);
         if (tridir != 0) {
-            if (tridir < 0) left_rotate(rbtree, nd_parent(node));
-            else right_rotate(rbtree, nd_parent(node));
+            if (tridir < 0)
+                left_rotate(rbtree, nd_parent(node));
+            else
+                right_rotate(rbtree, nd_parent(node));
             // Move up the tree
             node_t* tmp = curr;
             curr = node;
@@ -122,8 +123,10 @@ void rbtree_insert(rbtree_t* rbtree, node_t* node) {
             nd_set_color(grandpa(node), RED);
             nd_set_color(nd_parent(node), BLACK);
 
-            if (linedir < 0) right_rotate(rbtree, grandpa(node));
-            else left_rotate(rbtree, grandpa(node));
+            if (linedir < 0)
+                right_rotate(rbtree, grandpa(node));
+            else
+                left_rotate(rbtree, grandpa(node));
 
             break;
         }
@@ -143,7 +146,7 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
     }
 
     if (heir != NULL) {
-        swap(node, heir);
+        swap(rbtree, node, heir);
         Color tmp = nd_color(node);
         nd_set_color(node, nd_color(heir));
         nd_set_color(heir, tmp);
@@ -155,14 +158,14 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
     if (nd_left(node) != NULL) {
         assert(nd_color(node) != RED || nd_color(nd_left(node)) != RED);
         nd_set_color(nd_left(node), BLACK);
-        tlink(nd_parent(node), nd_left(node), is_lc(node));
+        rbtree_link(nd_parent(node), nd_left(node), is_lc(node));
         return;
     }
 
     if (nd_right(node) != NULL) {
         assert(nd_color(node) != RED || nd_color(nd_right(node)) != RED);
         nd_set_color(nd_right(node), BLACK);
-        tlink(nd_parent(node), nd_right(node), is_lc(node));
+        rbtree_link(nd_parent(node), nd_right(node), is_lc(node));
         return;
     }
 
@@ -172,7 +175,7 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
     while (true) {
         // Case 1
         if (nd_color(node) == RED) {
-            tlink(nd_parent(node), NULL, is_lc(node));
+            rbtree_link(nd_parent(node), NULL, is_lc(node));
             break;
         }
 
@@ -183,9 +186,8 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
         }
 
         // Case 3
-        if (nd_color(sibling(node)) == BLACK
-        && nd_color(nd_left(sibling(node))) == BLACK
-        && nd_color(nd_right(sibling(node))) == BLACK) {
+        if (nd_color(sibling(node)) == BLACK && nd_color(nd_left(sibling(node))) == BLACK &&
+            nd_color(nd_right(sibling(node))) == BLACK) {
             nd_set_color(sibling(node), RED);
             node_t* new_db = NULL;
 
@@ -196,12 +198,14 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
             }
 
             if (is_db_nil) {
-                tlink(nd_parent(node), NULL, is_lc(node));
+                rbtree_link(nd_parent(node), NULL, is_lc(node));
                 is_db_nil = false;
             }
 
-            if (new_db != NULL) node = new_db;
-            else break;
+            if (new_db != NULL)
+                node = new_db;
+            else
+                break;
             continue;
         }
 
@@ -211,8 +215,10 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
             nd_set_color(nd_parent(node), nd_color(sibling(node)));
             nd_set_color(sibling(node), tmp);
 
-            if (is_lc(node)) left_rotate(rbtree, nd_parent(node));
-            else right_rotate(rbtree, nd_parent(node));
+            if (is_lc(node))
+                left_rotate(rbtree, nd_parent(node));
+            else
+                right_rotate(rbtree, nd_parent(node));
             continue;
         }
 
@@ -220,14 +226,14 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
         node_t* far_nephew = is_lc(node) ? nd_right(sibling(node)) : nd_left(sibling(node));
         node_t* near_nephew = is_lc(node) ? nd_left(sibling(node)) : nd_right(sibling(node));
 
-        if (nd_color(sibling(node)) == BLACK
-        && nd_color(far_nephew) == BLACK
-        && nd_color(near_nephew) == RED) {
+        if (nd_color(sibling(node)) == BLACK && nd_color(far_nephew) == BLACK && nd_color(near_nephew) == RED) {
             nd_set_color(sibling(node), RED);
             nd_set_color(near_nephew, BLACK);
 
-            if (is_lc(node)) right_rotate(rbtree, sibling(node));
-            else left_rotate(rbtree, sibling(node));
+            if (is_lc(node))
+                right_rotate(rbtree, sibling(node));
+            else
+                left_rotate(rbtree, sibling(node));
             // Apply case 6
         }
 
@@ -240,11 +246,13 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
         nd_set_color(nd_parent(node), nd_color(sibling(node)));
         nd_set_color(sibling(node), tmp);
 
-        if (is_lc(node)) left_rotate(rbtree, nd_parent(node));
-        else right_rotate(rbtree, nd_parent(node));
+        if (is_lc(node))
+            left_rotate(rbtree, nd_parent(node));
+        else
+            right_rotate(rbtree, nd_parent(node));
 
         if (is_db_nil) {
-            tlink(nd_parent(node), NULL, is_lc(node));
+            rbtree_link(nd_parent(node), NULL, is_lc(node));
             is_db_nil = false;
         }
         nd_set_color(far_nephew, BLACK);
@@ -267,33 +275,48 @@ void rbtree_link(node_t* to_be_parent, node_t* to_be_child, bool left) {
         }
         nd_set_right(to_be_parent, to_be_child);
     }
-    if (to_be_child != NULL) nd_set_parent(to_be_child, to_be_parent);
+    if (to_be_child != NULL)
+        nd_set_parent(to_be_child, to_be_parent);
 }
 
-void swap(node_t* a, node_t* b) {
+void swap(rbtree_t* rbtree, node_t* a, node_t* b) {
     // Parent exchange
-    if (is_lc(a)) nd_set_left(nd_parent(a), b);
-    else nd_set_right(nd_parent(a), b);
+    if (rbtree->root != a) {
+        if (is_lc(a))
+            nd_set_left(nd_parent(a), b);
+        else
+            nd_set_right(nd_parent(a), b);
+    }
 
-    if (is_lc(b)) nd_set_left(nd_parent(b), a);
-    else nd_set_right(nd_parent(b), a);
+    if (rbtree->root != b) {
+        if (is_lc(b))
+            nd_set_left(nd_parent(b), a);
+        else
+            nd_set_right(nd_parent(b), a);
+    }
 
     node_t* tmp = nd_parent(a);
     nd_set_parent(a, nd_parent(b));
     nd_set_parent(b, tmp);
+    if (rbtree->root == a) rbtree->root = b;
+    else if (rbtree->root == b) rbtree->root = a;
 
     // Children exchange
     // Left child
-    if (nd_left(a) != NULL) nd_set_parent(nd_left(a), b);
-    if (nd_left(b) != NULL) nd_set_parent(nd_left(b), a);
+    if (nd_left(a) != NULL)
+        nd_set_parent(nd_left(a), b);
+    if (nd_left(b) != NULL)
+        nd_set_parent(nd_left(b), a);
 
     tmp = nd_left(a);
     nd_set_left(a, nd_left(b));
     nd_set_left(b, tmp);
 
     // Right child
-    if (nd_right(a) != NULL) nd_set_parent(nd_right(a), b);
-    if (nd_right(b) != NULL) nd_set_parent(nd_right(b), a);
+    if (nd_right(a) != NULL)
+        nd_set_parent(nd_right(a), b);
+    if (nd_right(b) != NULL)
+        nd_set_parent(nd_right(b), a);
 
     tmp = nd_right(a);
     nd_set_right(a, nd_right(b));
@@ -306,14 +329,14 @@ node_t* left_rotate(rbtree_t* rbtree, node_t* node) {
     nd_set_parent(nd_right(node), NULL);
 
     if (nd_parent(node) != NULL) {
-        tlink(nd_parent(node), nd_right(node), is_lc(node));
+        rbtree_link(nd_parent(node), nd_right(node), is_lc(node));
     }
 
     node_t* rl_gc = nd_left(nd_right(node));
 
-    tlink(nd_right(node), node, true);
+    rbtree_link(nd_right(node), node, true);
     nd_set_right(node, NULL);
-    tlink(node, rl_gc, false);
+    rbtree_link(node, rl_gc, false);
 
     if (rbtree->root == node) {
         rbtree->root = nd_parent(node);
@@ -327,14 +350,14 @@ node_t* right_rotate(rbtree_t* rbtree, node_t* node) {
     nd_set_parent(nd_left(node), NULL);
 
     if (nd_parent(node) != NULL) {
-        tlink(nd_parent(node), nd_left(node), is_lc(node));
+        rbtree_link(nd_parent(node), nd_left(node), is_lc(node));
     }
 
     node_t* lr_gc = nd_right(nd_left(node));
 
-    tlink(nd_left(node), node, false);
+    rbtree_link(nd_left(node), node, false);
     nd_set_left(node, NULL);
-    tlink(node, lr_gc, true);
+    rbtree_link(node, lr_gc, true);
 
     if (rbtree->root == node) {
         rbtree->root = nd_parent(node);
@@ -362,7 +385,8 @@ bool is_lc(node_t* node) {
 }
 
 node_t* min_node(node_t* node) {
-    if (node == NULL) return NULL;
+    if (node == NULL)
+        return NULL;
     while (nd_left(node) != NULL) {
         node = nd_left(node);
     }
@@ -370,7 +394,8 @@ node_t* min_node(node_t* node) {
 }
 
 node_t* max_node(node_t* node) {
-    if (node == NULL) return NULL;
+    if (node == NULL)
+        return NULL;
     while (nd_right(node) != NULL) {
         node = nd_right(node);
     }
@@ -379,22 +404,36 @@ node_t* max_node(node_t* node) {
 
 /* ---------------------------------- SHAPE --------------------------------- */
 char check_if_triangle(node_t* node) {
-    if (nd_parent(node) == NULL || grandpa(node) == NULL) return 0;
+    if (nd_parent(node) == NULL || grandpa(node) == NULL)
+        return 0;
 
-    if (!is_lc(node) && is_lc(nd_parent(node))) return -1;
-    if (is_lc(node) && !is_lc(nd_parent(node))) return 1;
+    if (!is_lc(node) && is_lc(nd_parent(node)))
+        return -1;
+    if (is_lc(node) && !is_lc(nd_parent(node)))
+        return 1;
     return 0;
 }
 
 char check_if_line(node_t* node) {
-    if (nd_parent(node) == NULL || grandpa(node) == NULL) return 0;
+    if (nd_parent(node) == NULL || grandpa(node) == NULL)
+        return 0;
 
-    if (is_lc(node) && is_lc(nd_parent(node))) return -1;
-    if (!is_lc(node) && !is_lc(nd_parent(node))) return 1;
+    if (is_lc(node) && is_lc(nd_parent(node)))
+        return -1;
+    if (!is_lc(node) && !is_lc(nd_parent(node)))
+        return 1;
     return 0;
 }
 
 /* -------------------------------- DEBUGGING ------------------------------- */
+uint32_t rbtree_to_vec(node_t* node, node_t* result[]) {
+    if (node == NULL) return 0;
+    result[0] = node;
+
+    uint32_t l_elems = rbtree_to_vec(nd_left(node), result + 1);
+    uint32_t r_elems = rbtree_to_vec(nd_right(node), result + 1 + l_elems);
+    return 1 + l_elems + r_elems;
+}
 /*
 Node snode(uint32_t size) {
     Node nody = { RED, NULL, NULL, NULL, size };
@@ -418,7 +457,7 @@ uint32_t rbtree_to_vec(node_t* node, Node* result) {
     result->right = nd_right(node);
     result->parent = nd_parent(node);
     result->size = bk_size(node);
-    
+
     uint32_t l_elems = rbtree_to_vec(nd_left(node), result + 1);
     uint32_t r_elems = rbtree_to_vec(nd_right(node), result + 1 + l_elems);
     return 1 + l_elems + r_elems;

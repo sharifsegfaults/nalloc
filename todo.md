@@ -6,6 +6,8 @@
 - [ ] Create crazy tests
 - [ ] Beautify the code :)
 - [ ] Fix mem leaks in fuzzer
+- [ ] Change uint32_t for something more general
+- [ ] Ghost node allows us to go branchless
 
 ### Postponed
 - Create heapchecker:

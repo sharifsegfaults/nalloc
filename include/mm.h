@@ -9,13 +9,10 @@
 
 #include "memlib.h"
 
-
-typedef uint32_t hptr_t;
-#define NULL_HPTR UINT32_MAX
+#include "rbtree.h"
 
 #define ALIGNMENT (alignof(max_align_t))
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT - 1))
-#define BK_TO_PTR(block) ((char*)mem_heap_lo() + block)
 
 #define EXPANSION_FACTOR 0.35
 #define PARTITION_THRESHOLD 20
@@ -33,15 +30,15 @@ typedef struct {
 
 // Thank you NegVorsa!
 typedef struct {
-    uint32_t __spfc;
-    hptr_t left;
-    hptr_t right;
-    hptr_t parent;
+    uint32_t __size_prevfree;
+    node_t rbtree_node;
 } FreeBlockHeader;
 
 typedef struct {
     uint32_t size;
 } BlockFooter;
+
+typedef FreeBlockHeader* bptr_t;
 
 /* ------------------------- BLOCK MEMBER VARIABLES ------------------------- */
 
@@ -52,30 +49,18 @@ typedef struct {
  *
  * @remark Obtains size from block's header (not footer)
  */
-extern uint32_t bk_size(hptr_t block);
-extern void bk_set_size(hptr_t block, uint32_t size);
+extern uint32_t bk_size(bptr_t block);
+extern void bk_set_size(bptr_t block, uint32_t size);
 
-extern bool bk_prev_free(hptr_t block);
-extern void bk_set_prev_free(hptr_t block, bool prev_free);
+extern bool bk_prev_free(bptr_t block);
+extern void bk_set_prev_free(bptr_t block, bool prev_free);
 
-extern hptr_t bk_left(hptr_t block);
-extern void bk_set_left(hptr_t block, hptr_t left);
-
-extern hptr_t bk_right(hptr_t block);
-extern void bk_set_right(hptr_t block, hptr_t right);
-
-extern hptr_t bk_parent(hptr_t block);
-extern void bk_set_parent(hptr_t block, hptr_t parent);
-
-extern Color bk_color(hptr_t block);
-extern void bk_set_color(hptr_t block, Color color);
-
-extern bool bk_is_free(hptr_t block);
-extern void bk_set_is_free(hptr_t block, bool is_free);
+extern bool bk_is_free(bptr_t block);
+extern void bk_set_is_free(bptr_t block, bool is_free);
 
 /* ----------------------------- BLOCK NEIGHBOURS ---------------------------- */
-extern hptr_t next_block(hptr_t block);
-extern hptr_t prev_block_if_free(hptr_t block);
+extern bptr_t next_block(bptr_t block);
+extern bptr_t prev_block_if_free(bptr_t block);
 
 /* -------------------------------------------------------------------------- */
 /*                               MAIN FUNCTIONS                               */
