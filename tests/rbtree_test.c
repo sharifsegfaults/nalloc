@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "utils.h"
 
-#include "rbtree.h"
+#include "containers/rbtree.h"
 
 static char* heap;
 

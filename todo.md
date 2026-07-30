@@ -8,6 +8,5 @@
 - [X] Change uint32_t for something more general
 - [ ] Ghost node allows us to go branchless
 
-### Postponed
-- Create heapchecker:
-    - There's never 2+ free blocks next to eachother
+## Stretch
+- [ ] Checksums

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "mm.h"
-#include "rbtree.h"
+#include "containers/rbtree.h"
 #include "utils.h"
 
 /* -------------------------------------------------------------------------- */

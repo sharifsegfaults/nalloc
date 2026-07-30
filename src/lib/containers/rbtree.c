@@ -1,59 +1,11 @@
 #include <assert.h>
 #include <stddef.h>
 
-#include "rbtree.h"
-
-/* -------------------------------------------------------------------------- */
-/*                            NODE MEMBER VARIABLES                           */
-/* -------------------------------------------------------------------------- */
-node_t* nd_left(node_t* node) {
-    assert(node != NULL);
-    return node->left;
-}
-
-void nd_set_left(node_t* node, node_t* left) {
-    assert(node != NULL);
-    node->left = left;
-}
-
-node_t* nd_right(node_t* node) {
-    assert(node != NULL);
-    return node->right;
-}
-
-void nd_set_right(node_t* node, node_t* right) {
-    assert(node != NULL);
-    node->right = right;
-}
-
-node_t* nd_parent(node_t* node) {
-    assert(node != NULL);
-    return (node_t*)((uintptr_t)(node->__pc) & ~0b1UL);
-}
-
-void nd_set_parent(node_t* node, node_t* parent) {
-    assert(node != NULL);
-    node->__pc = (node_t*)((uintptr_t)(node->__pc) & 0b1);
-    node->__pc = (node_t*)((uintptr_t)(node->__pc) | (uintptr_t)parent);
-}
-
-Color nd_color(node_t* node) {
-    return (node != NULL) ? (uintptr_t)node->__pc & 0b1 : BLACK;
-}
-
-void nd_set_color(node_t* node, Color color) {
-    assert(node != NULL);
-    node->__pc = (node_t*)((uintptr_t)node->__pc & ~0b1);
-    node->__pc = (node_t*)((uintptr_t)node->__pc | color);
-}
+#include "containers/rbtree.h"
 
 /* -------------------------------------------------------------------------- */
 /*                               RBTREE METHODS                               */
 /* -------------------------------------------------------------------------- */
-rbtree_t create_rbtree() {
-    return (rbtree_t){ NULL };
-}
-
 /**
  * @pre Assumes `node` is linked to the correct place as if this were a binary search tree
  */
@@ -367,25 +319,7 @@ node_t* right_rotate(rbtree_t* rbtree, node_t* node) {
     return nd_parent(node);
 }
 
-/* ----------------------------- FAMILY MEMBERS ----------------------------- */
-node_t* grandpa(node_t* node) {
-    return nd_parent(nd_parent(node));
-}
-
-node_t* uncle(node_t* node) {
-    return is_lc(nd_parent(node)) ? nd_right(grandpa(node)) : nd_left(grandpa(node));
-}
-
-node_t* sibling(node_t* node) {
-    return is_lc(node) ? nd_right(nd_parent(node)) : nd_left(nd_parent(node));
-}
-
 /* ---------------------------- NODE INFORMATION ---------------------------- */
-bool is_lc(node_t* node) {
-    assert(nd_parent(node) != NULL);
-    return nd_left(nd_parent(node)) == node;
-}
-
 node_t* min_node(node_t* node) {
     if (node == NULL)
         return NULL;

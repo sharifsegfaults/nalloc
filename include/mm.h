@@ -9,7 +9,7 @@
 
 #include "memlib.h"
 
-#include "rbtree.h"
+#include "containers/rbtree.h"
 
 #define ALIGNMENT (alignof(max_align_t))
 #define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT - 1))
