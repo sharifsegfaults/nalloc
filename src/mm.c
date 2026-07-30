@@ -333,7 +333,6 @@ void* nalloc(size_t size) {
         assert(!bk_is_free(free_block));
         assert(bk_size(free_block) >= size);
         assert((uintptr_t)((char*)(free_block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-        print_heap();
         return (char*)free_block + sizeof(AllocBlockHeader);
     }
 
@@ -395,7 +394,6 @@ void* nalloc(size_t size) {
     assert(!bk_is_free(last_bk));
     assert(bk_size(last_bk) >= size);
     assert((uintptr_t)((char*)(last_bk) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-    print_heap();
     return (char*)(last_bk) + sizeof(AllocBlockHeader);
 }
 
@@ -432,7 +430,6 @@ void nfree(void* ptr) {
     assert(bk_is_free(block));
     assert(next_block(block) == NULL || !bk_is_free(next_block(block)));
     assert(!bk_prev_free(block) || prev_block_if_free(block) == NULL);
-    print_heap();
 }
 
 void* nrealloc(void* ptr, size_t size) {
@@ -467,7 +464,6 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
         assert((uintptr_t)ptr % ALIGNMENT == 0);
-        print_heap();
         return ptr;
     }
 
@@ -492,7 +488,6 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(block));
         assert(bk_size(block) >= size);
         assert((uintptr_t)((char*)(block) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-        print_heap();
         return (char*)(block) + sizeof(AllocBlockHeader);
     }
 
@@ -535,7 +530,6 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
         assert((uintptr_t)pblock_uptr % ALIGNMENT == 0);
-        print_heap();
         return pblock_uptr;
     }
 
@@ -573,7 +567,6 @@ void* nrealloc(void* ptr, size_t size) {
         assert(!bk_is_free(pblock));
         assert(bk_size(pblock) >= size);
         assert((uintptr_t)((char*)(pblock) + sizeof(AllocBlockHeader)) % ALIGNMENT == 0);
-        print_heap();
         return (char*)(pblock) + sizeof(AllocBlockHeader);
     }
 

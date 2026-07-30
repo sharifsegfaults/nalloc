@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/tests/fuzzer",
-            "args": ["-n3"],
+            "args": ["-n", "1000000", "-m", "100000000"],
             "stopAtEntry": true,
             "cwd": "${fileDirname}",
             "environment": [],

@@ -74,7 +74,7 @@ bool fuzzer(size_t seed, size_t num_ops) {
 
     size_t ops = 0;
     size_t numblocks = 0;
-    Block blocks[num_ops];
+    Block* blocks = malloc(num_ops * sizeof(Block));
     stivec_t allocbks = create_stivec(num_ops);
 
     for (int i = 0; i < num_ops; ++i) {
