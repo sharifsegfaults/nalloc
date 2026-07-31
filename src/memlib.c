@@ -6,7 +6,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -21,14 +20,9 @@ static char *mem_max_addr;  /* largest legal heap address */
 /*
  * mem_init - initialize the memory system model
  */
-void mem_init(char *heap, size_t og_size) {
+void mem_init(size_t og_size) {
     /* allocate the storage we will use to model the available VM */
-    mem_start_brk = (heap != NULL) ? heap : malloc(MAX_HEAP);
-    if (mem_start_brk == NULL) {
-        fprintf(stderr, "mem_init_vm: malloc error\n");
-        exit(1);
-    }
-
+    mem_start_brk = sbrk(0);
     mem_max_addr = mem_start_brk + MAX_HEAP; /* max legal heap address */
     mem_brk = mem_start_brk + og_size;
 }
@@ -37,7 +31,7 @@ void mem_init(char *heap, size_t og_size) {
  * mem_deinit - free the storage used by the memory system model
  */
 void mem_deinit(void) {
-    free(mem_start_brk);
+    // free(mem_start_brk);
 }
 
 /*
@@ -53,13 +47,13 @@ void mem_reset_brk() {
  *    this model, the heap cannot be shrunk.
  */
 void *mem_sbrk(int incr) {
-    char *old_brk = mem_brk;
-
     if ((incr < 0) || ((mem_brk + incr) > mem_max_addr)) {
         errno = ENOMEM;
         fprintf(stderr, "ERROR: mem_sbrk failed. Ran out of memory...\n");
         return (void *)-1;
     }
+
+    char *old_brk = sbrk(incr);
     mem_brk += incr;
     return (void *)old_brk;
 }

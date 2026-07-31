@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdlib.h>
 #include <stddef.h>
 
 static inline size_t max_size_n(const size_t *values, size_t count) {

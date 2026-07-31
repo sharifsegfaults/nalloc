@@ -65,9 +65,6 @@ extern bptr_t prev_block_if_free(bptr_t block);
 /* -------------------------------------------------------------------------- */
 /*                               MAIN FUNCTIONS                               */
 /* -------------------------------------------------------------------------- */
-
-extern int mm_init(void);
-
 /**
  * @brief Allocate `size` bytes
  *

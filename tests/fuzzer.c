@@ -70,8 +70,6 @@ Block realloc_block(Block bk, size_t size) {
 /*                                   FUZZER                                   */
 /* -------------------------------------------------------------------------- */
 bool fuzzer(size_t seed, size_t num_ops) {
-    mm_init();
-
     size_t ops = 0;
     size_t numblocks = 0;
     Block* blocks = malloc(num_ops * sizeof(Block));
@@ -116,11 +114,8 @@ bool fuzzer(size_t seed, size_t num_ops) {
     return true;
 }
 
-void setUp(size_t seed, size_t max_heap_size) {
+void setUp(size_t seed) {
     srand(seed);
-
-    heap = malloc(max_heap_size);
-    mem_init(heap, max_heap_size);
 }
 
 typedef struct {
@@ -149,12 +144,11 @@ void get_options(int argc, char** argv, Options* options) {
         {"help"     , no_argument       , NULL  , 'h'},
 
         {"seed"     , optional_argument , NULL  , 's'},
-        {"maxheap"  , optional_argument , NULL  , 'm'},
         {"numops"   , optional_argument , NULL  , 'n'},
         {0          , 0                 , 0     , 0  }
     };
 
-    while((choice = getopt_long(argc, argv, "hs::m::n::", long_options, &index)) != -1) {
+    while((choice = getopt_long(argc, argv, "hs::n::", long_options, &index)) != -1) {
         switch (choice) {
         case 'h':
             help(*argv);
@@ -168,16 +162,6 @@ void get_options(int argc, char** argv, Options* options) {
             char* endptr;
             size_t arg = strtoull(optarg, &endptr, 10);
             options->seed = arg;
-            break;
-        }
-
-        case 'm': {
-            if (optarg == NULL && optind < argc && argv[optind][0] != '-') {
-                optarg = argv[optind++];
-            }
-            char* endptr;
-            size_t arg = strtoull(optarg, &endptr, 10);
-            options->max_heap_size = arg;
             break;
         }
 
@@ -203,23 +187,21 @@ void print_options(Options* options) {
     printf(
         "==[ NFUZZER ]====================\n"
         " Seed: %zu\n"
-        " Max heap size: %zu\n"
         " Number of operations: %zu\n"
         "=================================\n"
-    , options->seed, options->max_heap_size, options->numops);
+    , options->seed, options->numops);
 }
 
 int main(int argc, char *argv[]) {
     Options options = {
         // Defaults
         time(NULL),
-        1 * 1024 * 1024,
         100
     };
 
     get_options(argc, argv, &options);
     print_options(&options);
-    setUp(options.seed, options.max_heap_size);
+    setUp(options.seed);
 
     fuzzer(options.seed, options.numops);
     return 0;

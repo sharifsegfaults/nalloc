@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "mm.h"
 #include "containers/rbtree.h"
@@ -11,6 +10,7 @@
 /* -------------------------------------------------------------------------- */
 rbtree_t rbtree;
 size_t padding;
+bool first_time = true;
 
 /* -------------------------------------------------------------------------- */
 /*                           BLOCK MEMBER VARIABLES                           */
@@ -291,15 +291,13 @@ static void rbtree_insert(rbtree_t* rbtree, node_t* node) {
     rbtree_insert_fix(rbtree, node);
 }
 
-int mm_init() {
-    rbtree = create_rbtree();
-    mem_reset_brk();
-    return 0;
-}
-
 void* nalloc(size_t size) {
     // Lazy initialization
-    if (rbtree.root == NULL) {
+    if (first_time) {
+        mem_init(0);
+        first_time = !first_time;
+        rbtree = create_rbtree();
+        mem_reset_brk();
         padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
         void* res = mem_sbrk(padding);
         if (res == (void*)-1) {
