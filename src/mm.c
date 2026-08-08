@@ -15,12 +15,19 @@ bool first_time = true;
 /* -------------------------------------------------------------------------- */
 /*                           BLOCK MEMBER VARIABLES                           */
 /* -------------------------------------------------------------------------- */
-FreeBlockHeader* bk_free_header(bptr_t block) {
+static inline bptr_t next_block(bptr_t);
+
+static inline FreeBlockHeader* bk_free_header(bptr_t block) {
     assert(block != NULL);
     return (FreeBlockHeader*)block;
 }
 
-BlockFooter* bk_footer(bptr_t block) {
+static inline size_t bk_size(bptr_t block) {
+    assert(block != NULL);
+    return bk_free_header(block)->__size_prevfree & ~0b11;
+}
+
+static inline BlockFooter* bk_footer(bptr_t block) {
     assert(block != NULL);
     // clang-format off
     return (BlockFooter*)(
@@ -29,12 +36,7 @@ BlockFooter* bk_footer(bptr_t block) {
     // clang-format on
 }
 
-size_t bk_size(bptr_t block) {
-    assert(block != NULL);
-    return bk_free_header(block)->__size_prevfree & ~0b11;
-}
-
-void bk_set_size(bptr_t block, size_t size) {
+static inline void bk_set_size(bptr_t block, size_t size) {
     assert(block != NULL);
     assert(size >= MIN_BLOCK_SIZE);
     bk_free_header(block)->__size_prevfree &= 0b11;
@@ -43,46 +45,45 @@ void bk_set_size(bptr_t block, size_t size) {
     assert(bk_size(block) == size);
 }
 
-bool bk_prev_free(bptr_t block) {
+static inline bool bk_is_prev_free(bptr_t block) {
     assert(block != NULL);
     return bk_free_header(block)->__size_prevfree & 0b10;
 }
 
-void bk_set_prev_free(bptr_t block, bool prev_free) {
+static inline void bk_set_is_prev_free(bptr_t block, bool prev_free) {
     assert(block != NULL);
     bk_free_header(block)->__size_prevfree &= ~0b10;
     bk_free_header(block)->__size_prevfree |= prev_free << 1;
-    assert(bk_prev_free(block) == prev_free);
+    assert(bk_is_prev_free(block) == prev_free);
 }
 
-// size | prev_free | free
-bool bk_is_free(bptr_t block) {
+static inline bool bk_is_free(bptr_t block) {
     assert(block != NULL);
 
     // If this is the last block, the first node contains its prev free
     if (next_block(block) == NULL) {
-        return bk_prev_free(mem_heap_lo() + padding);
+        return bk_is_prev_free(mem_heap_lo() + padding);
     }
-    return bk_prev_free(next_block(block));
+    return bk_is_prev_free(next_block(block));
 }
 
-void bk_set_is_free(bptr_t block, bool is_free) {
+static inline void bk_set_is_free(bptr_t block, bool is_free) {
     assert(block != NULL);
     dbg_printf(is_free ? "%d block has been freed\n" : "%d block has been occupied\n", block);
 
     // If this is the last block, the first node contains its prev free
     if (next_block(block) == NULL) {
-        bk_set_prev_free(mem_heap_lo() + padding, is_free);
+        bk_set_is_prev_free(mem_heap_lo() + padding, is_free);
         assert(bk_is_free(block) == is_free);
         return;
     }
 
-    bk_set_prev_free(next_block(block), is_free);
+    bk_set_is_prev_free(next_block(block), is_free);
     assert(bk_is_free(block) == is_free);
 }
 
 /* ---------------------------- BLOCK NEIGHBOURS ---------------------------- */
-bptr_t next_block(bptr_t block) {
+static inline bptr_t next_block(bptr_t block) {
     assert(block != NULL);
     if ((uintptr_t)block + sizeof(AllocBlockHeader) + bk_size(block) >= (uintptr_t)mem_heap_hi()) {
         return NULL;
@@ -93,10 +94,10 @@ bptr_t next_block(bptr_t block) {
 /**
  * @brief Returns the previous block if the block is free -- otherwise, returns NULL
  */
-bptr_t prev_block_if_free(bptr_t block) {
-    // If allocated, user data could've overwritten footer, thus, we can only do this if the
+static inline bptr_t prev_block_if_free(bptr_t block) {
+    // If allocated, user data could've overwritten the footer, thus, we can only do this if the
     // previous block is free (and thus metadata has been reestablished)
-    if (block == mem_heap_lo() + padding || !bk_prev_free(block)) {
+    if (block == mem_heap_lo() + padding || !bk_is_prev_free(block)) {
         return NULL;
     }
 
@@ -170,7 +171,7 @@ static bptr_t partition_block(bptr_t block, size_t size_needed) {
     bool is_free_block = bk_is_free(block);
 
     bk_set_size(right_bk, total_right_space - sizeof(AllocBlockHeader));
-    bk_set_prev_free(right_bk, is_free_block);
+    bk_set_is_prev_free(right_bk, is_free_block);
     bk_set_is_free(right_bk, true);
 
     // If it's allocated we don't want to override the footer
@@ -230,7 +231,7 @@ void coalesce_blocks(bptr_t block1, bptr_t block2) {
     dbg_printf("Coalescing %d with %d -- Size of new block is %d\n", block1, block2, new_size);
 
     bptr_t block_with_my_prev_free = (next_block(block2) != NULL) ? next_block(block2) : mem_heap_lo() + padding;
-    bk_set_prev_free(block_with_my_prev_free, bk_is_free(block1));
+    bk_set_is_prev_free(block_with_my_prev_free, bk_is_free(block1));
     bk_set_size(block1, new_size);
     /* -------------------------------------------------------------------------- */
     assert(IS_VALID_BLOCK(block1));
@@ -238,7 +239,7 @@ void coalesce_blocks(bptr_t block1, bptr_t block2) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               RED-BLACK TREE                               */
+/*                          RED-BLACK TREE OPERATIONS                         */
 /* -------------------------------------------------------------------------- */
 static node_t* rbtree_find(rbtree_t* rbtree, size_t size) {
     node_t* curr_nd = rbtree->root;
@@ -291,6 +292,9 @@ static void rbtree_insert(rbtree_t* rbtree, node_t* node) {
     rbtree_insert_fix(rbtree, node);
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               MAIN FUNCTIONS                               */
+/* -------------------------------------------------------------------------- */
 void* nalloc(size_t size) {
     // Lazy initialization
     if (first_time) {
@@ -335,7 +339,7 @@ void* nalloc(size_t size) {
     }
 
     // There is no free block to accomodate this request :(
-    bool is_last_bk_free = bk_prev_free(mem_heap_lo() + padding);
+    bool is_last_bk_free = bk_is_prev_free(mem_heap_lo() + padding);
     bptr_t last_bk = NULL;
     size_t recyclable_space = 0;
 
@@ -371,7 +375,7 @@ void* nalloc(size_t size) {
     } else {
         last_bk = mem_heap_hi() - expansion_size + 1;
         bk_set_size(last_bk, expansion_size - sizeof(AllocBlockHeader));
-        bk_set_prev_free(last_bk, false);
+        bk_set_is_prev_free(last_bk, false);
         assert(IS_VALID_BLOCK(last_bk));
         assert(next_block(last_bk) == NULL);
     }
@@ -427,7 +431,7 @@ void nfree(void* ptr) {
     /* -------------------------------------------------------------------------- */
     assert(bk_is_free(block));
     assert(next_block(block) == NULL || !bk_is_free(next_block(block)));
-    assert(!bk_prev_free(block) || prev_block_if_free(block) == NULL);
+    assert(!bk_is_prev_free(block) || prev_block_if_free(block) == NULL);
 }
 
 void* nrealloc(void* ptr, size_t size) {

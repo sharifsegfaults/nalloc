@@ -40,28 +40,6 @@ typedef struct {
 
 typedef FreeBlockHeader* bptr_t;
 
-/* ------------------------- BLOCK MEMBER VARIABLES ------------------------- */
-
-/**
- * @brief Stores the size of the block if it were to be provided for allocation
- *
- * @pre Assumes header is well-formed
- *
- * @remark Obtains size from block's header (not footer)
- */
-extern size_t bk_size(bptr_t block);
-extern void bk_set_size(bptr_t block, size_t size);
-
-extern bool bk_prev_free(bptr_t block);
-extern void bk_set_prev_free(bptr_t block, bool prev_free);
-
-extern bool bk_is_free(bptr_t block);
-extern void bk_set_is_free(bptr_t block, bool is_free);
-
-/* ----------------------------- BLOCK NEIGHBOURS ---------------------------- */
-extern bptr_t next_block(bptr_t block);
-extern bptr_t prev_block_if_free(bptr_t block);
-
 /* -------------------------------------------------------------------------- */
 /*                               MAIN FUNCTIONS                               */
 /* -------------------------------------------------------------------------- */
