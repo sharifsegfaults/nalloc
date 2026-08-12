@@ -121,7 +121,7 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
         return;
     }
 
-    // The node is a leaf node -- we fight to get rid of double black
+    // The node to delete is a leaf node -- we fight to get rid of double black
     // ! node is now thought of as the double black node
     bool is_db_nil = true;
     while (true) {
@@ -189,7 +189,7 @@ void rbtree_remove(rbtree_t* rbtree, node_t* node) {
             // Apply case 6
         }
 
-        // Re-compute these
+        // Re-compute these - case 5 could've messed up the tree's structure
         far_nephew = is_lc(node) ? nd_right(sibling(node)) : nd_left(sibling(node));
         near_nephew = is_lc(node) ? nd_left(sibling(node)) : nd_right(sibling(node));
 

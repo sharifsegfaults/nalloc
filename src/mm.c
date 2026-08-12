@@ -174,7 +174,7 @@ static bptr_t partition_block(bptr_t block, size_t size_needed) {
     bk_set_is_prev_free(right_bk, is_free_block);
     bk_set_is_free(right_bk, true);
 
-    // If it's allocated we don't want to override the footer
+    // If it's allocated we don't want to override the footer -- it may be overwritten with user info
     if (!is_free_block) {
         BlockFooter user_info_in_new_footer;
         char* new_footer_ptr = (char*)block + sizeof(AllocBlockHeader) + size_needed - sizeof(BlockFooter);
@@ -215,10 +215,10 @@ static bptr_t partition_if_worth_it(bptr_t block, size_t size_needed) {
 }
 
 /**
- * @pre block1 is to the left of block2, both are free blocks, and both have been removed
- * from the rbtree
+ * @pre block1 is to the left of block2, at least one of them is a free block, and both have
+ * been removed from the rbtree
  *
- * @post Only the allocated header of block1 and header and footer of block2 will be modified
+ * @post Only the allocated header of block1 and and footer of block2 will be modified
  */
 void coalesce_blocks(bptr_t block1, bptr_t block2) {
     assert(IS_VALID_BLOCK(block1) && IS_VALID_BLOCK(block2));
@@ -338,7 +338,7 @@ void* nalloc(size_t size) {
         return (char*)free_block + sizeof(AllocBlockHeader);
     }
 
-    // There is no free block to accomodate this request :(
+    // There is no free block to accomodate this request :( -- so we expand the heap
     bool is_last_bk_free = bk_is_prev_free(mem_heap_lo() + padding);
     bptr_t last_bk = NULL;
     size_t recyclable_space = 0;

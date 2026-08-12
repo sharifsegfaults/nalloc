@@ -7,6 +7,9 @@ The name has no specific meaning. I think the original intention was for it to m
 ### Setup
 You can find how to use this memory allocator in [`SETUP.md`](SETUP.md)
 
+### Design
+You can find how `nalloc` works and its design in [`docs/DESIGN.md`](docs/DESIGN.md)
+
 ### Why?
 If you're familiar with me or my other repositories, you'll know how much I like to learn by doing. This is just another instance of that principle. I decided to start this project to learn about memory allocators, and learned a lot along the way.
 

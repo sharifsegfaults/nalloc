@@ -7,8 +7,7 @@ test: fuzzer rbtree_test
 dylib: src/memlib.c src/mm.c src/lib/containers/rbtree.c
 	gcc -dynamiclib $^ -o libnalloc.dylib ${RFLAGS}
 
-dylib-override: src/m
-emlib.c src/mm.c src/lib/containers/rbtree.c src/mm_override.c
+dylib-override: src/memlib.c src/mm.c src/lib/containers/rbtree.c src/mm_override.c
 	gcc -dynamiclib $^ -o libnalloc-override.dylib ${RFLAGS}
 
 fuzzer: src/memlib.c src/mm.c src/lib/containers/rbtree.c src/lib/containers/stivec.c tests/fuzzer.c
