@@ -1,6 +1,6 @@
 ## `nalloc` - design
 
-This is a walk through the process of designing `nalloc`
+This is a walk through some of the decisions and problems that led to `nalloc`'s design, and I hope it is helpful to anyone who is curious, or wants to know how this learning journey unfolded. Let's begin!
 
 We first need to pick an allocation policy. In this case, it'll be best fit (i.e., to suffice a request, we try to find the block that fits it the "tightest").
 
