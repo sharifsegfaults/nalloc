@@ -15,7 +15,7 @@ Personally, I have been more familiar with AVL trees (did not know about Red-Bla
 
 - Red-Black trees require storing the color of a node, and thus, require us to store only 1 more bit per block.
 
-It is clear the Red-Black trees make use of waaaay less memory that AVL trees, so they became the data structure used for `nalloc`.
+It is clear the Red-Black trees make use of waaaay less memory that AVL trees while maintaining very similar performance in practice, so they became the data structure used for `nalloc`.
 
 ### Designing a Block of Memory
 
@@ -36,7 +36,7 @@ Heap after (this is an oversimplification -- keep reading):
 +----------------------------------------+
 ```
 
-This is completely fine... if you're only trying to perform a single allocation throughout the programs lifetime, because the moment a second allocation mcomes, we get in trouble: Suppose the user now asks us to allocate 24 bytes. How could we tell where this soon-to-be-given block should start? Notice that for us, it is very clear: it should start in the 12th byte, but remember: we haven't stored any information related to any previous allocation, so the program doesn't know this.
+This is completely fine... if you're only trying to perform a single allocation throughout the programs lifetime, because the moment a second allocation mcomes, we get in trouble: Suppose the user now asks us to allocate 24 bytes. How could we tell where this soon-to-be-given block should start? Notice that for us, it is very clear: it should start in the 13th byte, but remember: we haven't stored any information related to any previous allocation, so the program doesn't know this.
 
 #### Our first pieces of metadata
 
@@ -78,13 +78,13 @@ Initial state of a 48 byte heap (we'll label the blocks with letters so that we 
 ```
 +--------------------------------------------------+
 [            A            ][          B            ]
-[  12  | false |  (12 B)  ][  31  | true | (31 B)  ]
+[  12  | false |  (12 B)  ][  26  | true | (26 B)  ]
 +--------------------------------------------------+
 ```
 
 > Notice that, taking into account the size of the headers, all of the sizes now make sense
 
-Great! Now, if the user calls something like `nalloc(16)`, our program would visit the first byte of the heap, see that said block is 12 bytes long and not free, so it would be able to skip to the next block, a 31 bytes block that's free, and thus can be used to satisfy the request.
+Great! Now, if the user calls something like `nalloc(16)`, our program would visit the first byte of the heap, see that said block is 12 bytes long and not free, so it would be able to skip to the next block, a 26-bytes block that's free, and thus can be used to satisfy the request.
 
 #### Freedom unites us
 
@@ -120,7 +120,7 @@ Let's see how everything would look after this modification:
 [  43  | true |               (43 B)               ]
 +--------------------------------------------------+
 ```
-> **Note**: Why is this new block of size 43 if 12 + 26 = 38? the reason is simple: when the two blocks coalesce, we no longer need to keep track of the metadata of B, and thus, we can include those 5 bytes for use in the new block. 12 + 26 + 5 = 43.\
+> **Note**: Why is this new block of size 43 if 12 + 26 = 38? the reason is simple: when the two blocks coalesce, we no longer need to keep track of the metadata of B, and thus, we can include those 5 bytes for use in the new block. 12 + 26 + 5 = 43.
 
 Yay :D -- or well, not so fast. Consider this scenario:
 
@@ -159,7 +159,7 @@ To see this, consider that on the call to `nfree(B)`, all the information the `n
 
 You may say "well, can't we just go back 12 bytes (skipping the `data` section of `A`) and another 5 bytes (skipping the header of `A`), land at the beginning of block `A`, and then merge the blocks together?" and... yes, we could... if we knew what the size of `A`'s `data` section is, but, just by having a pointer to the beginning of `B`, it is impossible to know this: as far as `nfree` knows, the previous block could have a `data` section of 12, 32, or 1'000'000 bytes.
 
-This is precisely what motivates the next change in the design of our memory block -- at the end of a block, we can store the block's size, that way, a block can travel 4 bytes back, read the size of its left block's user section, skip it, and then skip another 5 bytes (the header) and land at the beginning of its left block, and then perform coalescing.
+This is precisely what motivates the next change in the design of our memory block -- at the end of a block, we can store the block's size. That way, a block can travel 4 bytes back, read the size of its left block's `data` section, skip it, and then skip another 5 bytes (the header) and land at the beginning of its left block, and then perform coalescing.
 
 ```
 MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
@@ -203,11 +203,11 @@ Thus, we now focus on reducing the size of metadata without losing any data.
 
 ##### The 1-bit fields
 
-One of the first things we can easily notice is that there are some fields for which we could use a single bit (`is_free` --> A yes/no answer, or `color` --> either red or black) instead of 1 byte. We could make these fields be 1-bit long, but then we would be messing up the block's alignment, which we do not want (what do I mean by alignment? See [this](https://medium.com/@pawanwagh/understanding-memory-alignment-for-better-performance-3075787cfd3b)).
+One of the first things we can easily notice is that there are some fields for which we could use a single bit (`is_free` --> a yes/no answer, or `color` --> either red or black) instead of 1 byte. We could make these fields be 1-bit long, but then we would be messing up the block's alignment, which we do not want (what do I mean by alignment? See [this](https://medium.com/@pawanwagh/understanding-memory-alignment-for-better-performance-3075787cfd3b)).
 
 One of the requirements of our memory allocator is for it to return pointers that are aligned to a given value, which is usually 16 bytes (to make SIMD easier). This is a behavior also replicated by `malloc`, which returns pointers aligned to a given value (usually 8 bytes for 32-bit and 16 for 64-bit). In this example, let's assume we need to return 4-byte aligned pointers (everything we say will also apply to 8, 16, 32, etc., as you'll see).
 
-Now that we have clarified this, notice that this restriction actually gives us a key insight: the size of a block must be a multiple of 4, otherwise, the next block will start at a non 4-byte aligned address. Because of being a multiple of 4, we know that its 2 least significant bits will be 0s, and thus, we can store `is_free` in the last significant bit! Applying the same logic allows us to store `color` in the last bit opf `parent`.
+Now that we have clarified this, notice that this restriction actually gives us a key insight: the size of a block must be a multiple of 4, otherwise, the next block will start at a non 4-byte aligned address. Because of being a multiple of 4, we know that the two least significant bits of a block's size field will be 0s, and thus, we can store `is_free` in the least significant bit! Applying the same logic allows us to store `color` in the least significant bit opf `parent`.
 
 ```
 MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
@@ -218,7 +218,7 @@ MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
 METADATA SIZE: 20 Bytes
 ```
 
-Yay! We've decreased the metadata size by 2 bytes, *which, I know, is a very small amount*, but at least it's something! Nonetheless, we can take the savings further
+Yay! We've decreased the metadata size by 2 bytes, *which, I know, is a very small amount*, but at least it's something! Nonetheless, we can take the savings further.
 
 ##### Do we really need all of this?
 
@@ -242,7 +242,9 @@ FREE MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
 METADATA SIZE: 20 Bytes
 ```
 
-Wonderful! We have reduced the metadata size to 8 bytes, which is a massive improvement. Notice nonetheless that this imposes a limit: the minimum size a block can be. Since, once a block is freed, the first 12 bytes of its allocated`data` section will be used to reinstate the `left`, `right`, and `parent` fields, we need the `data` section of an allocated block to be at least 12 bytes, which implies a minimum size of 20 bytes. This will be the case from now on, where the minimum block size is dictated by the metadata size of a free block.
+Wonderful! We have reduced the metadata size to 8 bytes, which is a massive improvement. Notice nonetheless that this imposes a limit: the minimum size a block can be. Since, once a block is freed, the first 12 bytes of its allocated`data` section will be used to reinstate the `left`, `right`, and `parent + color` fields, we need the `data` section of an allocated block to be at least 12 bytes.
+
+>This value (the minimum size of a block's `data` section) will change as we optimize more. To make the reading easier, I will include this information under an allocated block's design. Notice also that this number is fundamentally dictated by the metadata size of a free block.
 
 8 bytes is nice, but we can make things better...
 
@@ -259,7 +261,10 @@ IN-USE MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
 |            (4 B)             |               (X B)              |    (1 B)     |
 +--------------------------------------------------------------------------------+
 METADATA SIZE: 5 Bytes
+MINIMUM DATA SECTION SIZE: 15 Bytes
 ```
+
+> It is important to notice that the "IS_FREE" flag on the footer occupies only 1 bit (represented by the "(1b)" to its side), it's just that we cannot give 0.875 bytes to the user, so we simply preserve the whole byte.
 
 "But Sharif, we still need the size to be at the block's footer whenever the block is free so that others can coalesce with it" -- you're right, and that's why, whenever the user frees a given block, we simply reinstate the size in the footer (we use the last 4 bytes of the block -- last byte is where `IS_FREE` lives, and the 3 remaining needed bytes come from the last 3 bytes of the `data` section. Since the user just freed the block, they're not gonna use the `data` section anymore, so we can overwrite it with no trouble). Thus, for a free block, we have:
 
@@ -271,14 +276,15 @@ FREE MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
 +-----------------------------------------------------------------------------------------------------------+
 METADATA SIZE: 20 Bytes
 ```
+> Notice that we still need "IS_FREE" to be in the last bit, which is possible thanks to the observation that size must be a multiple of 4, and thus the last 2 bits of the size field will always be 0 (so we can use them to store other information)
 
-5 bytes is an amazing quantity, but that `1 Byte` at the end of the block breaks all symmetry... can we somehow make it disappear?
+5 bytes is an amazing quantity, but that "1 Byte" at the end of the block breaks all symmetry... can we somehow make it disappear?
 
 ##### Using symmetry as an excuse to improve metadata size
 
-Life would be wonderful if we could just get rid of that last byte in an in-use block that is being used to store whether or not the block is free. You may think we could make it occupy a single bit, and although it is possible, it's just annoying, plus we cannot give to the user spare bits -- anything we give to the user needs to be in terms of bytes (so those 31 bits would still be there -- just occupying space and doing nothing).
+Life would be wonderful if we could just get rid of that last byte in an in-use block that is being used to store whether or not the block is free. You may think we could make it occupy a single bit, and although it is possible, it's just annoying, plus we cannot give to the user spare bits (as mentioned before) -- anything we give to the user needs to be in terms of bytes (so those 31 bits would still be there -- just occupying space and doing nothing).
 
-This is where the last optimization comes into play: how about, in the header, instead of storing `IS_FREE`, which tells us whether or not the current block is free, we store `IS_PREV_FREE` which tells us whether or not the *previous* block is free -- this way, whenever we need to check if we can merge with the left block whenever we get freed, we can just look at out own header, without relying on the previous block's footer at all. We can still know whether or not a given block is free just by getting to its right block (which we've already established can be done solely with the information from the current block's header) and checking the right block's `IS_PREV_FREE`.
+This is where the last optimization comes into play: how about, in the header, instead of storing `IS_FREE` (which tells us whether or not the current block is free) we store `IS_PREV_FREE` which tells us whether or not the *previous* block is free -- this way, whenever we need to check if we can merge with the left block whenever we get freed, we can just look at out own header, without relying on the previous block's footer at all. We can still know whether or not a given block is free just by getting to its right block (which we've already established can be done solely with the information from the current block's header) and checking the right block's `IS_PREV_FREE`.
 
 This, dear reader, is what allows us to have this beautiful, final memory block design:
 
@@ -289,6 +295,7 @@ IN-USE MEMORY BLOCK DESIGN (ASSUMING 32-bit ARCH.)
 |            (4 B)             |                          (X B)                          |
 +----------------------------------------------------------------------------------------+
 METADATA SIZE: 4 Bytes
+MINIMUM DATA SECTION SIZE: 16 Bytes
 ```
 
 ```
